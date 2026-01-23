@@ -338,8 +338,8 @@ body {
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
-    bottom: 28%;
-    /* Adjusted to 28% as requested */
+    bottom: 20%;
+    /* Adjusted lower for mobile alignment */
 
     margin: 0;
     padding: 0px;
