@@ -1,5 +1,6 @@
 // Backend API URL
-const API_URL = 'http://localhost:3000/api/check';
+// Empty string to use relative path (works for both localhost and Vercel if served from same origin)
+const API_URL = '/api/check';
 
 // Utility to get query params
 function getQueryParam(param) {
@@ -125,7 +126,7 @@ async function updateGameStatus(prizeName) {
     if (!code) return;
 
     try {
-        await fetch('http://localhost:3000/api/update', {
+        await fetch('/api/update', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ code: code, prize: prizeName })

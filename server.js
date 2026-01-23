@@ -3,9 +3,13 @@ const cors = require('cors');
 const axios = require('axios');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
+app.use(express.json()); // Enable JSON body parsing
+
+// Serve static files from the current directory
+app.use(express.static('.'));
 
 // Configuration
 const NOCODB_API_URL = 'https://nocodb.smax.in/api/v2/tables/mkuczx2ud6zitcr/records';
