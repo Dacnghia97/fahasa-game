@@ -70,6 +70,7 @@ body {
     line-height: 1.2;
     background: linear-gradient(to bottom, #fff7ad, #ffa000);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
     filter: drop-shadow(0px 4px 6px rgba(0, 0, 0, 0.8));
     transform: rotate(-5deg);
@@ -165,6 +166,7 @@ body {
     transition: transform 0.1s;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
 }
 
 .btn:active {
@@ -287,6 +289,55 @@ body {
 }
 
 /* --- Popup --- */
+/* Custom Rules Popup Styles */
+.popup-rules-custom {
+    max-width: 450px !important;
+    width: 95% !important;
+}
+
+.rules-bg-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.rules-bg-img {
+    width: 100%;
+    display: block;
+    filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.5));
+}
+
+.rules-scroll-area {
+    position: absolute;
+    top: 14%;
+    left: 12%;
+    width: 76%;
+    height: 72%;
+    overflow-y: auto;
+    padding-right: 5px;
+    /* Custom Scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: #d8a027 transparent;
+}
+
+.rules-scroll-area::-webkit-scrollbar {
+    width: 6px;
+}
+
+.rules-scroll-area::-webkit-scrollbar-thumb {
+    background-color: #d8a027;
+    border-radius: 3px;
+}
+
+.rules-scroll-area::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.rules-content-img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
 .popup-overlay {
     position: fixed;
     top: 0;
@@ -332,7 +383,7 @@ body {
     /* grid-template-rows: repeat(2, 1fr); */
     gap: 0px;
     column-gap: 15px;
-    width: 70%;
+    width: 80%;
 
     /* Absolute positioning to place it freely on background */
     position: absolute;
@@ -354,6 +405,7 @@ body {
     cursor: pointer;
     transition: transform 0.2s;
     position: relative;
+    touch-action: manipulation;
 }
 
 /* Game Page - Flat Grid Layout */
@@ -463,4 +515,14 @@ body {
     width: 100%;
     height: auto;
     display: block;
+}
+
+/* Ensure contact popup appears above result popup */
+#popup-contact {
+    z-index: 200 !important;
+}
+
+/* Ensure rules popup appears above everything */
+#popup-rules {
+    z-index: 300 !important;
 }

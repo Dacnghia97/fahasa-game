@@ -1,4 +1,5 @@
 const express = require('express');
+require('dotenv').config();
 const cors = require('cors');
 const axios = require('axios');
 const path = require('path');
@@ -31,7 +32,9 @@ app.get('/api/check', async (req, res) => {
 
         res.json({
             valid: true,
-            status: record.status
+            status: record.status,
+            prize: record.prize,
+            prize_id: record.prize_id // Return prize_id
         });
 
     } catch (err) {
@@ -42,9 +45,9 @@ app.get('/api/check', async (req, res) => {
 
 // ===== UPDATE STATUS =====
 app.post('/api/update', async (req, res) => {
-    const { code, prize } = req.body;
-    if (!code || !prize) {
-        return res.status(400).json({ error: 'Missing code or prize' });
+    const { code, prize, prize_id } = req.body;
+    if (!code || !prize || !prize_id) {
+        return res.status(400).json({ error: 'Missing code, prize, or prize_id' });
     }
 
     try {
@@ -59,7 +62,7 @@ app.post('/api/update', async (req, res) => {
 
         await axios.patch(
             NOCODB_API_URL,
-            { Id: record.Id, prize, status: 'PLAYER' },
+            { Id: record.Id, prize, prize_id, status: 'PLAYER' },
             { headers: { 'xc-token': NOCODB_TOKEN } }
         );
 

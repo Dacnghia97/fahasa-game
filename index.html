@@ -103,32 +103,6 @@
             </div>
         </div>
 
-        <!-- Result Popup -->
-        <div id="result-popup" class="popup-overlay" style="display: none;">
-            <div class="popup-container animate-popup">
-                <!-- Content will be injected or static -->
-                <img src="assets/popup-gift.png" alt="Phần quà" class="popup-note-img" id="result-image">
-
-                <div id="result-note" class="result-note"></div>
-
-
-                <div class="popup-actions">
-                    <a href="https://www.fahasa.com/tryout/history/" id="btn-fpoint" class="btn-popup-action"
-                        style="display: none;">
-                        <img src="assets/btn-fpoint.png" alt="Ví F-point">
-                    </a>
-
-                    <div id="btn-contact" class="btn-popup-action" style="display: none;" onclick="showContactInfo()">
-                        <img src="assets/btn-contact.png" alt="Liên hệ">
-                    </div>
-
-                    <img src="assets/btn-home.png" alt="Màn hình chính" class="btn-popup-action" onclick="goHome()">
-                </div>
-
-                <div class="popup-close-btn" onclick="closeResultPopup()"></div>
-            </div>
-        </div>
-
         <!-- Mascot (as footer or absolute) -->
         <!-- Based on reference, mascot is at the bottom. The background image likely contains it? 
              User sent background image. Let's assume background image has the mascot. 
@@ -159,8 +133,13 @@
 
     <!-- Rules Popup -->
     <div id="popup-rules" class="popup-overlay" style="display:none;">
-        <div class="popup-container">
-            <img src="assets/popup-rules.png" alt="Thể Lệ" class="popup-note-img">
+        <div class="popup-container popup-rules-custom">
+            <div class="rules-bg-wrapper">
+                <img src="assets/popup-rules-bg.png" alt="Background" class="rules-bg-img">
+                <div class="rules-scroll-area">
+                    <img src="assets/popup-rules-content.png" alt="Nội dung thể lệ" class="rules-content-img">
+                </div>
+            </div>
             <button class="btn-popup-close" onclick="closePopup()">
                 <img src="assets/btn-understood.png" alt="Đã hiểu">
             </button>
@@ -171,6 +150,13 @@
     <div id="popup-contact" class="popup-overlay" style="display:none;" onclick="closeSpecificPopup('popup-contact')">
         <div class="popup-container" onclick="event.stopPropagation()">
             <img src="assets/popup-contact.png" alt="Thông tin liên hệ" class="popup-note-img">
+
+            <div class="popup-actions" style="margin-top: 15px;">
+                <img src="assets/btn-view-rules.png" alt="Xem Thể Lệ" class="btn-popup-action"
+                    onclick="closeSpecificPopup('popup-contact'); showRules()">
+                <img src="assets/btn-home.png" alt="Màn hình chính" class="btn-popup-action"
+                    onclick="closeSpecificPopup('popup-contact'); goHome()">
+            </div>
         </div>
     </div>
 
@@ -181,6 +167,25 @@
             <button class="btn-popup-close btn-sm" onclick="closeSpecificPopup('popup-expired'); showRules()">
                 <img src="assets/btn-view-rules.png" alt="Xem Thể Lệ">
             </button>
+        </div>
+    </div>
+
+    <!-- Result Popup (Moved Global) -->
+    <div id="result-popup" class="popup-overlay" style="display: none;">
+        <div class="popup-container animate-popup">
+            <img src="assets/popup-gift.png" alt="Phần quà" class="popup-note-img" id="result-image">
+            <div id="result-note" class="result-note"></div>
+            <div class="popup-actions">
+                <a href="https://www.fahasa.com/tryout/history/" id="btn-fpoint" class="btn-popup-action"
+                    style="display: none;">
+                    <img src="assets/btn-fpoint.png" alt="Ví F-point">
+                </a>
+                <div id="btn-contact" class="btn-popup-action" style="display: none;" onclick="showContactInfo()">
+                    <img src="assets/btn-contact.png" alt="Liên hệ">
+                </div>
+                <img src="assets/btn-home.png" alt="Màn hình chính" class="btn-popup-action" onclick="goHome()">
+            </div>
+            <div class="popup-close-btn" onclick="closeResultPopup()"></div>
         </div>
     </div>
 

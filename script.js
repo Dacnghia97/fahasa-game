@@ -25,12 +25,25 @@ async function checkGameCondition() {
             if (data.status === 'INVITED') {
                 return true; // Allowed to play
             } else if (data.status === 'PLAYER') {
-                // Show text on Home Page
+                // Change Start Button to Review Prize Button
+                const btnStart = document.querySelector('.btn-primary');
+                if (btnStart) {
+                    const btnImg = btnStart.querySelector('img');
+                    if (btnImg) {
+                        btnImg.src = 'assets/btn-review.png';
+                        btnImg.alt = 'Xem lại quà';
+                    }
+                    // Store prize ID for startProgram to handle
+                    currentUserPrize = data.prize_id || data.prize;
+                }
+
+                // Show player status msg
                 const msg = document.getElementById('player-status-msg');
                 if (msg) {
                     msg.innerText = "Bạn đã hết lượt chơi";
                     msg.style.display = 'block';
                 }
+
                 return false;
             } else if (data.status === 'EXPIRED') {
                 // Show Expired Popup
@@ -54,25 +67,157 @@ async function checkGameCondition() {
     }
 }
 
+// Map prize name to ID/Config
+function getPrizeConfigByName(prizeName) {
+    if (!prizeName) return null;
+    const cleanName = prizeName.trim().toLowerCase();
+
+    for (const [id, config] of Object.entries(prizes)) {
+        if (config.name.trim().toLowerCase() === cleanName) {
+            return config;
+        }
+    }
+    return null;
+}
+
+// Helper to find prize by ID (preferred) or Name
+function getPrizeConfig(key) {
+    if (!key) return null;
+    const cleanKey = String(key).trim().toLowerCase();
+
+    for (const config of Object.values(prizes)) {
+        if (!config.id) continue;
+        const id = config.id.toLowerCase();
+
+        // Match exact, underscore swapped, no dash, or just suffix number
+        if (
+            cleanKey === id ||
+            cleanKey === id.replace('-', '_') ||
+            cleanKey === id.replace('-', '') ||
+            cleanKey === id.split('-')[1] // Matches "2" against "prize-2"
+        ) {
+            return config;
+        }
+    }
+
+    // Legacy Name fallback
+    for (const config of Object.values(prizes)) {
+        if (config.name && config.name.trim().toLowerCase() === cleanKey) {
+            return config;
+        }
+    }
+
+    return null;
+}
+
+function showReviewPopup(prizeKey) {
+    console.log("Review prize key:", prizeKey);
+    console.log("Available prizes:", prizes);
+
+    if (!prizeKey) {
+        alert("Bạn chưa có phần quà nào được ghi nhận.");
+        return;
+    }
+
+    // Use the robust helper
+    const prizeConfig = getPrizeConfig(prizeKey);
+
+    if (prizeConfig) {
+        console.log("Prize Config Found:", prizeConfig);
+        const popup = document.getElementById('result-popup');
+        const resultImage = document.getElementById('result-image');
+        const noteElement = document.getElementById('result-note');
+        const btnFpoint = document.getElementById('btn-fpoint');
+        const btnContact = document.getElementById('btn-contact');
+
+        console.log("DOM Elements:", { popup, resultImage, noteElement, btnFpoint, btnContact });
+
+        if (popup && resultImage) {
+            console.log("Setting popup content...");
+            resultImage.src = prizeConfig.src;
+            if (noteElement) noteElement.innerText = prizeConfig.note;
+
+            if (btnFpoint) btnFpoint.style.display = 'none';
+            if (btnContact) btnContact.style.display = 'none';
+
+            if (prizeConfig.type === 'fpoint' && btnFpoint) {
+                btnFpoint.style.display = 'flex';
+            } else if (prizeConfig.type === 'computer' && btnContact) {
+                btnContact.style.display = 'flex';
+            }
+            popup.style.display = 'flex';
+            console.log("Popup display set to flex");
+        } else {
+            console.error("Critical: Popup or Result Image element missing in DOM");
+        }
+    } else {
+        // Fallback or Handle "Lì xì rỗng" or unknown prize
+        const keyStr = String(prizeKey);
+        if (keyStr.includes("rỗng")) {
+            alert("Lì xì rỗng, chúc bạn may mắn lần sau!");
+        } else {
+            // Debug alert to help user report issue
+            alert("Không tìm thấy thông tin quà cho ID: " + keyStr + ". Vui lòng chụp màn hình gửi admin.");
+            console.warn("Unknown prize ID:", keyStr);
+        }
+    }
+}
+
+// Flag to prevent multiple interactions
+let isProcessing = false;
+let currentUserPrize = null; // Store prize if player has already played
+
 async function startProgram() {
+    if (isProcessing) return;
+
+    // Check if we are in "Review Mode"
+    if (currentUserPrize) {
+        showReviewPopup(currentUserPrize);
+        return;
+    }
+
     console.log("User clicked Start");
 
-    // Check condition before starting
-    const canPlay = await checkGameCondition();
+    const btnStart = document.querySelector('.btn-primary');
+    if (btnStart) {
+        btnStart.style.opacity = '0.7';
+        btnStart.style.pointerEvents = 'none'; // Disable clicks
+    }
 
-    if (canPlay) {
-        // Transition to Game Page
-        const homePage = document.getElementById('home-page');
-        const gamePage = document.getElementById('game-page');
 
-        if (homePage && gamePage) {
-            homePage.style.display = 'none';
-            gamePage.style.display = 'flex';
+    isProcessing = true;
+
+    try {
+        // Check condition before starting
+        const canPlay = await checkGameCondition();
+
+        if (canPlay) {
+            // Transition to Game Page
+            const homePage = document.getElementById('home-page');
+            const gamePage = document.getElementById('game-page');
+
+            if (homePage && gamePage) {
+                homePage.style.display = 'none';
+                gamePage.style.display = 'flex';
+            }
+            setTimeout(() => { isProcessing = false; }, 500);
+        } else {
+            isProcessing = false;
+        }
+    } catch (e) {
+        console.error(e);
+        isProcessing = false;
+    } finally {
+        if (btnStart && !isProcessing) {
+            // Reset button if we didn't start game (e.g. invalid, or now showing Review button)
+            btnStart.style.opacity = '1';
+            btnStart.style.pointerEvents = 'auto'; // Re-enable so they can click "Review"
         }
     }
 }
 
 function showGifts() {
+    if (isProcessing) return;
     console.log("User clicked Gifts");
     const popup = document.getElementById('popup-gift');
     if (popup) {
@@ -81,6 +226,7 @@ function showGifts() {
 }
 
 function showRules() {
+    if (isProcessing) return;
     console.log("User clicked Rules");
     const popup = document.getElementById('popup-rules');
     if (popup) {
@@ -103,15 +249,27 @@ window.addEventListener('DOMContentLoaded', () => {
         if (popup) {
             popup.style.display = 'flex';
         }
-    }, 2000); // 2 seconds delay
+
+        // Background check to update button state proactively?
+        // It's better UX to check condition on load too, or just wait for click.
+        // User said: "Khi click vào button... thì sẽ kiểm tra" (Wait, user said "update cho màn hình trang chủ... check status check... nếu là Player thì đổi button")
+        // This implies we should check on load.
+        checkGameCondition().then(res => {
+            // If player, logic inside checkGameCondition will have swapped the button.
+            // We don't need to do anything else here.
+        });
+
+    }, 2000);
 });
 
 const prizes = {
-    2: { type: 'computer', name: 'Máy tính Casio FX580', src: 'assets/prize-2.png', note: 'CSKH Fahasa sẽ sớm liên hệ hướng dẫn bạn nhận giải' },
-    3: { type: 'fpoint', name: '5.000 F-point', src: 'assets/prize-3.png', note: '5K F-Point đã được thêm vào ví của bạn' },
-    4: { type: 'fpoint', name: '200.000 F-point', src: 'assets/prize-4.png', note: '200K F-Point đã được thêm vào ví của bạn' },
-    5: { type: 'fpoint', name: '10.000 F-point', src: 'assets/prize-5.png', note: '10K F-Point đã được thêm vào ví của bạn' }
+    2: { id: 'prize-2', type: 'computer', name: 'Máy tính Casio FX580', src: 'assets/prize-2.png', note: 'CSKH Fahasa sẽ sớm liên hệ hướng dẫn bạn nhận giải' },
+    3: { id: 'prize-3', type: 'fpoint', name: '5.000 F-point', src: 'assets/prize-3.png', note: '5K F-Point đã được thêm vào ví của bạn' },
+    4: { id: 'prize-4', type: 'fpoint', name: '200.000 F-point', src: 'assets/prize-4.png', note: '200K F-Point đã được thêm vào ví của bạn' },
+    // Use 'prize-5' ID to ensure unique lookup, even if user said 'prize-4' for 10k
+    5: { id: 'prize-5', type: 'fpoint', name: '10.000 F-point', src: 'assets/prize-5.png', note: '10K F-Point đã được thêm vào ví của bạn' }
 };
+
 
 function showContactInfo() {
     const popup = document.getElementById('popup-contact');
@@ -121,7 +279,7 @@ function showContactInfo() {
 }
 
 // API Update Function
-async function updateGameStatus(prizeName) {
+async function updateGameStatus(prizeName, prizeId) {
     const code = getQueryParam('random_code');
     if (!code) return;
 
@@ -129,9 +287,9 @@ async function updateGameStatus(prizeName) {
         await fetch('/api/update', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code: code, prize: prizeName })
+            body: JSON.stringify({ code: code, prize: prizeName, prize_id: prizeId })
         });
-        console.log("Updated prize on server:", prizeName);
+        console.log("Updated prize on server:", prizeName, prizeId);
     } catch (error) {
         console.error("Failed to update status:", error);
     }
@@ -139,28 +297,24 @@ async function updateGameStatus(prizeName) {
 
 // Game Logic
 function selectEnvelope(id) {
+    if (isProcessing) return;
     console.log("Selected Envelope ID: " + id);
 
-    // Find the specific element that was clicked (OR find by ID if we don't pass event)
-    // Here we need to find the element. efficient way:
-    // We can change onclick="selectEnvelope(1, this)" in HTML, OR find by querying children.
-    // Let's assume we find it by index since we have a grid.
+    // Find the specific element that was clicked
     const envelopes = document.querySelectorAll('.envelope-item');
-    // id is 1-based, index is 0-based
     const targetEnvelope = envelopes[id - 1];
 
     if (targetEnvelope) {
-        // Add shaking class
-        targetEnvelope.classList.add('shaking');
+        isProcessing = true; // Block other interactions
 
-        // Remove float animation temporarily if needed, but shaking overrides usually fine.
-        // Wait 1.5 seconds
+        // Show result immediately without shaking
+        showResult(id);
+
+        // Reset processing state shortly after to allow other interactions if needed
         setTimeout(() => {
-            targetEnvelope.classList.remove('shaking');
-            showResult(id);
-        }, 1500);
+            isProcessing = false;
+        }, 300);
     } else {
-        // Fallback if element not found (should not happen)
         showResult(id);
     }
 }
@@ -181,8 +335,11 @@ function showResult(id) {
         const resultImage = document.getElementById('result-image');
         const prizeData = prizes[id];
 
-        // Call Update API
-        updateGameStatus(prizeData.name);
+        // Store prize ID locally so we know status changed
+        currentUserPrize = prizeData.id;
+
+        // Call Update API with ID
+        updateGameStatus(prizeData.name, prizeData.id);
 
         if (popup && resultImage) {
             resultImage.src = prizeData.src;
@@ -206,7 +363,7 @@ function showResult(id) {
         }
     } else {
         // Empty envelope
-        updateGameStatus("Lì xì rỗng");
+        updateGameStatus("Lì xì rỗng", "prize-empty");
         alert("Lì xì rỗng, chúc bạn may mắn lần sau!");
     }
 }
@@ -248,11 +405,24 @@ function goHome() {
 
     if (homePage && gamePage) {
         gamePage.style.display = 'none';
-        homePage.style.display = 'block'; // Or 'flex' depending on original
+        homePage.style.display = 'block';
     }
 
-    // Optional: Reset grid/envelopes if needed?
-    // For now, simple navigation back.
+    // If we have a prize, update the home screen button to "Review Mode"
+    if (currentUserPrize) {
+        const btnStart = document.querySelector('.btn-primary');
+        if (btnStart) {
+            const btnImg = btnStart.querySelector('img');
+            if (btnImg) {
+                btnImg.src = 'assets/btn-review.png';
+                btnImg.alt = 'Xem lại quà';
+            }
+            // Logic is already handled by startProgram checking currentUserPrize
+            // Just need to ensure visuals are updated
+            btnStart.style.opacity = '1';
+            btnStart.style.pointerEvents = 'auto';
+        }
+    }
 }
 function closePopup() {
     const popups = document.querySelectorAll('.popup-overlay');
