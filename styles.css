@@ -383,7 +383,7 @@ body {
     /* grid-template-rows: repeat(2, 1fr); */
     gap: 0px;
     column-gap: 15px;
-    width: 80%;
+    width: 75%;
 
     /* Absolute positioning to place it freely on background */
     position: absolute;
