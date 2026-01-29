@@ -13,7 +13,9 @@ async function checkGameCondition() {
     const code = getQueryParam('random_code');
 
     if (!code) {
-        alert("Không tìm thấy mã tham dự (random_code). Vui lòng kiểm tra lại đường dẫn.");
+        // Show Access Error Popup
+        const popup = document.getElementById('popup-access-error');
+        if (popup) popup.style.display = 'flex';
         return false;
     }
 
@@ -25,26 +27,17 @@ async function checkGameCondition() {
             if (data.status === 'INVITED') {
                 return true; // Allowed to play
             } else if (data.status === 'PLAYER') {
-                // Change Start Button to Review Prize Button
-                const btnStart = document.querySelector('.btn-primary');
-                if (btnStart) {
-                    const btnImg = btnStart.querySelector('img');
-                    if (btnImg) {
-                        btnImg.src = 'assets/btn-review.png';
-                        btnImg.alt = 'Xem lại quà';
-                    }
-                    // Store prize ID for startProgram to handle
-                    currentUserPrize = data.prize_id || data.prize;
-                }
+                // Change Start Button to Review Prize Button - NO, User wants "Start" button to trigger notice first.
+                // We keep button as is ( Start Icon ) so they can click it.
+                // Only AFTER they click and see popup -> "Understood" -> Then show "Out of Turns" and maybe "Review"?
 
-                // Show player status msg
-                const msg = document.getElementById('player-status-msg');
-                if (msg) {
-                    msg.innerText = "Bạn đã hết lượt chơi";
-                    msg.style.display = 'block';
-                }
+                // But we DO need to store the prize.
+                // Store prize ID for startProgram to handle
+                // currentUserPrize = data.prize_id || data.prize; // CHANGE: Don't set this yet.
+                pendingPlayerPrize = data.prize_id || data.prize;
 
-                return false;
+                // Return special status to handle later
+                return 'PLAYER_NOTICE_PENDING';
             } else if (data.status === 'EXPIRED') {
                 // Show Expired Popup
                 const expiredPopup = document.getElementById('popup-expired');
@@ -57,7 +50,9 @@ async function checkGameCondition() {
                 return false;
             }
         } else {
-            alert("Mã tham dự không hợp lệ hoặc không tìm thấy.");
+            // Invalid code -> Show Access Error Popup
+            const popup = document.getElementById('popup-access-error');
+            if (popup) popup.style.display = 'flex';
             return false;
         }
     } catch (error) {
@@ -166,6 +161,7 @@ function showReviewPopup(prizeKey) {
 // Flag to prevent multiple interactions
 let isProcessing = false;
 let currentUserPrize = null; // Store prize if player has already played
+let pendingPlayerPrize = null; // Store prize temporarily for PLAYER status flow
 
 async function startProgram() {
     if (isProcessing) return;
@@ -191,7 +187,7 @@ async function startProgram() {
         // Check condition before starting
         const canPlay = await checkGameCondition();
 
-        if (canPlay) {
+        if (canPlay === true) {
             // Transition to Game Page
             const homePage = document.getElementById('home-page');
             const gamePage = document.getElementById('game-page');
@@ -201,6 +197,48 @@ async function startProgram() {
                 gamePage.style.display = 'flex';
             }
             setTimeout(() => { isProcessing = false; }, 500);
+        } else if (canPlay === 'PLAYER_NOTICE_PENDING') {
+            // Show Notice Popup for Player Status
+            const popup = document.getElementById('welcome-popup');
+            if (popup) {
+                // Override Close Button to Show "Out of Turns" msg
+                const closeBtn = popup.querySelector('.btn-popup-close');
+                // Remove old event listener is hard without reference, so we'll clone it? or just set onclick attribute
+                // Simple onclick replacement:
+                if (closeBtn) {
+                    // Need to reset this later to avoid affecting normal flow? 
+                    // Actually welcome-popup is usually just "Close".
+                    closeBtn.onclick = function () {
+                        closeSpecificPopup('welcome-popup');
+                        // Show "Out of turns" message
+                        const msg = document.getElementById('player-status-msg');
+                        if (msg) {
+                            msg.innerText = "Bạn đã hết lượt chơi";
+                            msg.style.display = 'block';
+                        }
+
+                        // Move pending prize to current prize
+                        if (pendingPlayerPrize) {
+                            currentUserPrize = pendingPlayerPrize;
+                            pendingPlayerPrize = null;
+                        }
+
+                        // Also switch button to Review if we have a prize?
+                        if (currentUserPrize) {
+                            const btnStart = document.querySelector('.btn-primary');
+                            if (btnStart) {
+                                const btnImg = btnStart.querySelector('img');
+                                if (btnImg) {
+                                    btnImg.src = 'assets/btn-review.png';
+                                    btnImg.alt = 'Xem lại quà';
+                                }
+                            }
+                        }
+                    };
+                }
+                popup.style.display = 'flex';
+            }
+            isProcessing = false;
         } else {
             isProcessing = false;
         }
@@ -208,6 +246,7 @@ async function startProgram() {
         console.error(e);
         isProcessing = false;
     } finally {
+        // If we are pending notice, button stays faded? No, we reset it.
         if (btnStart && !isProcessing) {
             // Reset button if we didn't start game (e.g. invalid, or now showing Review button)
             btnStart.style.opacity = '1';
@@ -239,24 +278,34 @@ window.addEventListener('DOMContentLoaded', () => {
     // strict check for random_code
     const code = getQueryParam('random_code');
     if (!code) {
-        // Block access
-        document.body.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100vh;background:#004d40;color:white;text-align:center;padding:20px;"><h1>Lỗi Truy Cập</h1><p>Bạn cần có mã tham dự để truy cập trang này.</p></div>';
+        // Show Access Error Popup instead of blocking body
+        const popup = document.getElementById('popup-access-error');
+        if (popup) popup.style.display = 'flex';
+        // We let the UI render behind it (Home page)
         return;
     }
 
     setTimeout(() => {
-        const popup = document.getElementById('welcome-popup');
-        if (popup) {
-            popup.style.display = 'flex';
-        }
+        // Remove automatic welcome-popup check.
+        // The user says "Khi click vào button Bắt đầu ngay... mới hiển thị popup..."
+        // So we should NOT show it automatically after 2s if the user wants this flow.
+        // OR the user meant "If status is PLAYER, don't show notice... wait for click".
+        // But for normal users (INVITED), do we show it?
 
-        // Background check to update button state proactively?
-        // It's better UX to check condition on load too, or just wait for click.
-        // User said: "Khi click vào button... thì sẽ kiểm tra" (Wait, user said "update cho màn hình trang chủ... check status check... nếu là Player thì đổi button")
-        // This implies we should check on load.
-        checkGameCondition().then(res => {
-            // If player, logic inside checkGameCondition will have swapped the button.
-            // We don't need to do anything else here.
+        // Let's assume we keep the welcome popup for regular flow maybe?
+        // But the user's request seems specific to the PLAYER flow interaction.
+        // "Khi trạng thái là PLAYER thì sẽ không hiển thị popup-notice luôn" -> "popup-notice" here likely refers to the "Lưu ý" popup (id='welcome-popup' uses 'popup-notice.png').
+
+        // So: If PLAYER, don't auto show. If INVITED, auto show?
+        // Let's check condition first.
+
+        checkGameCondition().then(status => {
+            // If status is true (INVITED), show welcome popup?
+            if (status === true) {
+                const popup = document.getElementById('welcome-popup');
+                if (popup) popup.style.display = 'flex';
+            }
+            // If status is 'PLAYER_NOTICE_PENDING', do NOT show popup yet.
         });
 
     }, 2000);
