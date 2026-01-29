@@ -11,6 +11,11 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
+// ===== HEALTH CHECK =====
+app.get('/health', (req, res) => {
+    res.status(200).send('OK');
+});
+
 // ===== CONFIG =====
 const NOCODB_API_URL = 'https://nocodb.smax.in/api/v2/tables/mkuczx2ud6zitcr/records';
 const NOCODB_TOKEN = process.env.NOCODB_TOKEN;
