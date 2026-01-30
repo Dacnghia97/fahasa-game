@@ -49,13 +49,97 @@ app.get('/api/check', async (req, res) => {
 });
 
 // ===== UPDATE STATUS =====
-app.post('/api/update', async (req, res) => {
-    const { code, prize, prize_id } = req.body;
-    if (!code || !prize || !prize_id) {
-        return res.status(400).json({ error: 'Missing code, prize, or prize_id' });
+// ===== UPDATE STATUS =====
+// ===== PRIZE CONFIGURATION =====
+// Adjust limits via Environment Variables on Railway
+// Defaults are set to Production values
+const PRIZE_LIMITS = {
+    'prize-2': parseInt(process.env.PRIZE_LIMIT_2 || '6'),      // Máy tính
+    'prize-3': parseInt(process.env.PRIZE_LIMIT_3 || '1500'),   // 5k Fpoint
+    'prize-4': parseInt(process.env.PRIZE_LIMIT_4 || '20'),     // 200k Fpoint
+    'prize-5': parseInt(process.env.PRIZE_LIMIT_5 || '500')     // 10k Fpoint
+};
+
+const PRIZE_NAMES = {
+    'prize-2': 'Máy tính Casio FX580',
+    'prize-3': '5.000 F-point',
+    'prize-4': '200.000 F-point',
+    'prize-5': '10.000 F-point'
+};
+
+// Helper: Get Current Prize Counts from NocoDB
+async function getPrizeCounts() {
+    const counts = {};
+    const promises = Object.keys(PRIZE_LIMITS).map(async (prizeId) => {
+        try {
+            const whereClause = `(prize_id,eq,${prizeId})`;
+            const res = await axios.get(NOCODB_API_URL, {
+                headers: { 'xc-token': NOCODB_TOKEN },
+                params: {
+                    where: whereClause,
+                    limit: 1 // We only need the count metadata
+                }
+            });
+            // NocoDB V2 usually returns { list: [], pageInfo: { totalRows: 10 } }
+            // If structure is different, fallback to 0. 
+            // Note: If project doesn't return pageInfo by default, we might need a different approach.
+            // Assuming standard response here based on typical NocoDB usage.
+            counts[prizeId] = res.data.pageInfo?.totalRows ?? 0;
+        } catch (e) {
+            console.error(`Error counting ${prizeId}:`, e.message);
+            counts[prizeId] = 0; // Safe fallback, though risky for limits
+        }
+    });
+    await Promise.all(promises);
+    return counts;
+}
+
+// Helper: Pick a Random Prize based on weights (remaining quantity)
+function pickRandomPrize(currentCounts) {
+    const availablePrizes = [];
+
+    // Calculate remaining quantity for each prize
+    for (const [id, limit] of Object.entries(PRIZE_LIMITS)) {
+        const used = currentCounts[id] || 0;
+        const remaining = Math.max(0, limit - used);
+
+        if (remaining > 0) {
+            availablePrizes.push({ id, weight: remaining });
+        }
     }
 
+    if (availablePrizes.length === 0) {
+        return null; // Out of stock
+    }
+
+    // Weighted Random Selection
+    const totalWeight = availablePrizes.reduce((sum, p) => sum + p.weight, 0);
+    let random = Math.random() * totalWeight;
+
+    for (const prize of availablePrizes) {
+        if (random < prize.weight) {
+            return prize.id;
+        }
+        random -= prize.weight;
+    }
+
+    return availablePrizes[availablePrizes.length - 1].id; // Fallback
+}
+
+// ===== UPDATE STATUS & PLAY GAME =====
+app.post('/api/update', async (req, res) => {
+    const { code, status } = req.body;
+    // NOTE: We ignore 'prize' and 'prize_id' from client when status is PLAYER
+    // because Server now decides the prize.
+
+    if (!code) {
+        return res.status(400).json({ error: 'Missing code' });
+    }
+
+    const targetStatus = status || 'PLAYER';
+
     try {
+        // 1. Find the Record
         const whereClause = `(random_code,eq,${code})`;
         const findRes = await axios.get(NOCODB_API_URL, {
             headers: { 'xc-token': NOCODB_TOKEN },
@@ -65,13 +149,71 @@ app.post('/api/update', async (req, res) => {
         const record = findRes.data.list?.[0];
         if (!record) return res.status(404).json({ error: 'Record not found' });
 
-        await axios.patch(
-            NOCODB_API_URL,
-            { Id: record.Id, prize, prize_id, status: 'PLAYER' },
-            { headers: { 'xc-token': NOCODB_TOKEN } }
-        );
+        // 2. Cheat Protection Logic
+        if (targetStatus === 'OPENNING') {
+            if (record.status !== 'INVITED') {
+                // Idempotency: If already OPENNING (same session), assume retry? 
+                // But typically client handles that. Server blocks strictly.
+                // Unless it's the SAME device re-sending? 
+                // For safety: strict block.
+                return res.status(409).json({ error: 'Start blocked', currentStatus: record.status });
+            }
+            // Just update status to OPENNING
+            await axios.patch(NOCODB_API_URL, { Id: record.Id, status: 'OPENNING' }, { headers: { 'xc-token': NOCODB_TOKEN } });
+            return res.json({ success: true, status: 'OPENNING' });
+        }
 
-        res.json({ success: true });
+        if (targetStatus === 'PLAYER') {
+            // If already played, return the existing prize (Don't roll again)
+            if (record.status === 'PLAYER') {
+                return res.json({
+                    success: true,
+                    status: 'PLAYER',
+                    prize: record.prize,
+                    prize_id: record.prize_id
+                });
+            }
+
+            // Ensure valid transition (must lie in OPENNING or INVITED)
+            if (record.status !== 'INVITED' && record.status !== 'OPENNING') {
+                return res.status(409).json({ error: 'Check blocked', currentStatus: record.status });
+            }
+
+            // 3. LOTTERY LOGIC (Server Side)
+            const currentCounts = await getPrizeCounts();
+            const winningPrizeId = pickRandomPrize(currentCounts);
+
+            if (!winningPrizeId) {
+                // Out of stock behavior
+                // Option A: Return specific error
+                // Option B: Give a fallback "consolation prize" (if config allows)
+                return res.status(422).json({ error: 'All prizes are out of stock!' });
+            }
+
+            const winningPrizeName = PRIZE_NAMES[winningPrizeId];
+
+            // 4. Update NocoDB
+            await axios.patch(
+                NOCODB_API_URL,
+                {
+                    Id: record.Id,
+                    status: 'PLAYER',
+                    prize: winningPrizeName,
+                    prize_id: winningPrizeId
+                },
+                { headers: { 'xc-token': NOCODB_TOKEN } }
+            );
+
+            console.log(`User ${code} won ${winningPrizeId} (${winningPrizeName})`);
+
+            // 5. Return Prize to Client
+            return res.json({
+                success: true,
+                status: 'PLAYER',
+                prize: winningPrizeName,
+                prize_id: winningPrizeId
+            });
+        }
 
     } catch (err) {
         console.error(err.response?.data || err.message);

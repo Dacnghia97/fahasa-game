@@ -45,6 +45,14 @@ async function checkGameCondition() {
                     expiredPopup.style.display = 'flex';
                 }
                 return false;
+            } else if (data.status === 'OPENNING') { // Handle OPENNING status
+                // Check if WE are the owner
+                const sessionKey = 'started_' + code;
+                const isOwner = localStorage.getItem(sessionKey);
+                if (isOwner) {
+                    return true; // We started it, let us continue
+                }
+                return 'OPENNING';
             } else {
                 alert(`Trạng thái không hợp lệ: ${data.status}`);
                 return false;
@@ -162,9 +170,16 @@ function showReviewPopup(prizeKey) {
 let isProcessing = false;
 let currentUserPrize = null; // Store prize if player has already played
 let pendingPlayerPrize = null; // Store prize temporarily for PLAYER status flow
+let isOutOfStock = false; // Flag for Out of Stock state
 
 async function startProgram() {
     if (isProcessing) return;
+
+    // Check Out of Stock first
+    if (isOutOfStock) {
+        showOpeningPopup(); // Use existing "Hết lượt" popup
+        return;
+    }
 
     // Check if we are in "Review Mode"
     if (currentUserPrize) {
@@ -173,6 +188,7 @@ async function startProgram() {
     }
 
     console.log("User clicked Start");
+    const code = getQueryParam('random_code');
 
     const btnStart = document.querySelector('.btn-primary');
     if (btnStart) {
@@ -180,11 +196,36 @@ async function startProgram() {
         btnStart.style.pointerEvents = 'none'; // Disable clicks
     }
 
-
     isProcessing = true;
 
     try {
-        // Check condition before starting
+        // --- STRICT START BLOCKING ---
+        // Check if we already own this session
+        const sessionKey = 'started_' + code;
+        const isOwner = localStorage.getItem(sessionKey);
+
+        if (!isOwner) {
+            // Attempt to mark as OPENNING
+            const success = await updateGameStatus(null, null, 'OPENNING');
+
+            if (success) {
+                // We successfully claimed the OPENNING status
+                localStorage.setItem(sessionKey, 'true');
+            } else {
+                // Failed (likely someone else started).
+                // Show blocked popup and Exit.
+                showOpeningPopup();
+                isProcessing = false;
+                if (btnStart) {
+                    btnStart.style.opacity = '1';
+                    btnStart.style.pointerEvents = 'auto';
+                }
+                return;
+            }
+        }
+        // -----------------------------
+
+        // Check condition before entering
         const canPlay = await checkGameCondition();
 
         if (canPlay === true) {
@@ -238,6 +279,10 @@ async function startProgram() {
                 }
                 popup.style.display = 'flex';
             }
+            isProcessing = false;
+        } else if (canPlay === 'OPENNING') {
+            // Show Opening Popup
+            showOpeningPopup();
             isProcessing = false;
         } else {
             isProcessing = false;
@@ -304,6 +349,8 @@ window.addEventListener('DOMContentLoaded', () => {
             if (status === true) {
                 const popup = document.getElementById('welcome-popup');
                 if (popup) popup.style.display = 'flex';
+            } else if (status === 'OPENNING') {
+                showOpeningPopup();
             }
             // If status is 'PLAYER_NOTICE_PENDING', do NOT show popup yet.
         });
@@ -328,19 +375,49 @@ function showContactInfo() {
 }
 
 // API Update Function
-async function updateGameStatus(prizeName, prizeId) {
+// API Update Function
+// Update Game Status (Modified for Server-Side Logic)
+async function updateGameStatus(prizeName, prizeId, statusParam) {
     const code = getQueryParam('random_code');
-    if (!code) return;
+    if (!code) return null;
+
+    // Build Payload
+    const payload = { code: code };
+    if (statusParam) payload.status = statusParam;
+    // We only send prizeName/prizeId if it's NOT a PLAYER claim request
+    // Ensure we don't accidentally send old client prize logic
+    if (statusParam !== 'PLAYER') {
+        if (prizeName) payload.prize = prizeName;
+        if (prizeId) payload.prize_id = prizeId;
+    }
 
     try {
-        await fetch('/api/update', {
+        const response = await fetch(`${API_URL.replace('/api/check', '/api/update')}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code: code, prize: prizeName, prize_id: prizeId })
+            body: JSON.stringify(payload)
         });
-        console.log("Updated prize on server:", prizeName, prizeId);
+
+        if (response.status === 409) {
+            console.warn("Cheat detected or status changed externally.");
+            return null; // Failed
+        }
+
+        if (response.status === 422) {
+            console.warn("All prizes are out of stock!");
+            return 'OUT_OF_STOCK';
+        }
+
+        if (!response.ok) {
+            throw new Error("Server error");
+        }
+
+        const data = await response.json();
+        console.log("Updated status via server:", data);
+        return data; // Return full data (including prize info if PLAYER)
     } catch (error) {
         console.error("Failed to update status:", error);
+        return null;
     }
 }
 
@@ -356,10 +433,9 @@ function selectEnvelope(id) {
     if (targetEnvelope) {
         isProcessing = true; // Block other interactions
 
-        // Show result immediately without shaking
+        // Show result
         showResult(id);
 
-        // Reset processing state shortly after to allow other interactions if needed
         setTimeout(() => {
             isProcessing = false;
         }, 300);
@@ -368,7 +444,7 @@ function selectEnvelope(id) {
     }
 }
 
-function showResult(id) {
+async function showResult(envelopeId) {
     // Reset buttons and note
     const btnFpoint = document.getElementById('btn-fpoint');
     const btnContact = document.getElementById('btn-contact');
@@ -378,42 +454,82 @@ function showResult(id) {
     if (btnContact) btnContact.style.display = 'none';
     if (noteElement) noteElement.innerText = '';
 
-    // Check if envelope has a prize
-    if (prizes[id]) {
+    // CALL SERVER TO GET PRIZE (Lottery Happens Here)
+    const result = await updateGameStatus(null, null, 'PLAYER');
+
+    if (result === 'OUT_OF_STOCK') {
+        isOutOfStock = true;
+
+        // Show "Out of Stock" notification using result popup
         const popup = document.getElementById('result-popup');
         const resultImage = document.getElementById('result-image');
-        const prizeData = prizes[id];
-
-        // Store prize ID locally so we know status changed
-        currentUserPrize = prizeData.id;
-
-        // Call Update API with ID
-        updateGameStatus(prizeData.name, prizeData.id);
+        const noteElement = document.getElementById('result-note');
+        const btnFpoint = document.getElementById('btn-fpoint');
+        const btnContact = document.getElementById('btn-contact');
 
         if (popup && resultImage) {
-            resultImage.src = prizeData.src;
+            // Hide Image for Text-Only notification
+            resultImage.style.display = 'none';
+            if (noteElement) noteElement.innerText = "Rất tiếc, các phần quà đã hết";
 
-            // Set note text
-            if (noteElement && prizeData.note) {
-                noteElement.innerText = prizeData.note;
-            }
-
-            // Show relevant button
-            if (prizeData.type === 'fpoint' && btnFpoint) {
-                btnFpoint.style.display = 'flex'; // or block/inline-flex
-            } else if (prizeData.type === 'computer' && btnContact) {
-                btnContact.style.display = 'flex';
-            }
+            // Hide buttons
+            if (btnFpoint) btnFpoint.style.display = 'none';
+            if (btnContact) btnContact.style.display = 'none';
 
             popup.style.display = 'flex';
+        } else {
+            alert("Rất tiếc, các phần quà đã hết");
+        }
 
-            // Trigger Fireworks
-            triggerFireworks();
+        // Wait 2 seconds then go Home
+        setTimeout(() => {
+            if (popup) popup.style.display = 'none'; // Close popup
+            goHome();
+        }, 2000);
+        return;
+    }
+
+    if (result && result.success && result.prize_id) {
+        // Success! We have a prize from server.
+        const prizeId = result.prize_id;
+        const prizeData = getPrizeConfig(prizeId); // Reuse existing helper to find config
+
+        // Store prize ID locally
+        currentUserPrize = prizeId;
+
+        if (prizeData) {
+            const popup = document.getElementById('result-popup');
+            const resultImage = document.getElementById('result-image');
+
+            if (popup && resultImage) {
+                resultImage.src = prizeData.src;
+                resultImage.style.display = 'block'; // Ensure image is visible
+
+                // Set note text
+                if (noteElement && prizeData.note) {
+                    noteElement.innerText = prizeData.note;
+                }
+
+                // Show relevant button
+                if (prizeData.type === 'fpoint' && btnFpoint) {
+                    btnFpoint.style.display = 'flex';
+                } else if (prizeData.type === 'computer' && btnContact) {
+                    btnContact.style.display = 'flex';
+                }
+
+                popup.style.display = 'flex';
+
+                // Trigger Fireworks
+                triggerFireworks();
+            }
+        } else {
+            // Can't find config for this prize ID?
+            alert("Chúc mừng bạn trúng: " + result.prize + ". (Lỗi hiển thị: Không tìm thấy hình ảnh)");
         }
     } else {
-        // Empty envelope
-        updateGameStatus("Lì xì rỗng", "prize-empty");
-        alert("Lì xì rỗng, chúc bạn may mắn lần sau!");
+        // Failed (Cheat, Error, or Out of Stock)
+        // If it was strict blocking, showOpeningPopup or just alert
+        showOpeningPopup();
     }
 }
 
@@ -487,5 +603,12 @@ function closeSpecificPopup(id) {
     const popup = document.getElementById(id);
     if (popup) {
         popup.style.display = 'none';
+    }
+}
+
+function showOpeningPopup() {
+    const popup = document.getElementById('popup-opening');
+    if (popup) {
+        popup.style.display = 'flex';
     }
 }
