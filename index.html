@@ -180,6 +180,22 @@
         </div>
     </div>
 
+    <!-- Opening Status Popup (New) -->
+    <div id="popup-opening" class="popup-overlay" style="display:none;" onclick="closeSpecificPopup('popup-opening')">
+        <div class="popup-container" onclick="event.stopPropagation()">
+            <img src="assets/popup-opening.png" alt="Hết lượt" class="popup-note-img">
+            <div class="popup-actions" style="margin-top: 15px;">
+                <div id="btn-contact-opening" class="btn-popup-action"
+                    onclick="showContactInfo(); closeSpecificPopup('popup-opening')">
+                    <img src="assets/btn-contact.png" alt="Liên hệ">
+                </div>
+                <div class="btn-popup-action" onclick="closeSpecificPopup('popup-opening'); goHome()">
+                    <img src="assets/btn-home.png" alt="Màn hình chính">
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Result Popup (Moved Global) -->
     <div id="result-popup" class="popup-overlay" style="display: none;">
         <div class="popup-container animate-popup">
@@ -199,7 +215,7 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=cheat_protect_1"></script>
 </body>
 
 </html>
