@@ -72,6 +72,9 @@ let prizeCache = {
     TTL: 15000 // 15 seconds
 };
 
+// Concurrency Lock
+const processingLocks = new Set();
+
 // Helper: Get Current Prize Counts from NocoDB
 async function getPrizeCounts() {
     // Return cached data if valid
@@ -147,6 +150,12 @@ app.post('/api/update', async (req, res) => {
         return res.status(400).json({ error: 'Missing code' });
     }
 
+    // LOCK: Prevent double-click race conditions
+    if (processingLocks.has(code)) {
+        return res.status(429).json({ error: 'Request in progress' });
+    }
+    processingLocks.add(code);
+
     const targetStatus = status || 'PLAYER';
 
     try {
@@ -204,38 +213,48 @@ app.post('/api/update', async (req, res) => {
 
             const winningPrizeName = PRIZE_NAMES[winningPrizeId];
 
-            // 4. Update NocoDB
-            await axios.patch(
-                NOCODB_API_URL,
-                {
-                    Id: record.Id,
-                    status: 'PLAYER',
-                    prize: winningPrizeName,
-                    prize_id: winningPrizeId
-                },
-                { headers: { 'xc-token': NOCODB_TOKEN } }
-            );
-
             console.log(`User ${code} won ${winningPrizeId} (${winningPrizeName})`);
 
-            // 5. Return Prize to Client
-
+            // 5. OPTIMISTIC RESPONSE (Return to client immediately)
             // Update Cache Immediately
             if (winningPrizeId && prizeCache.data) {
                 prizeCache.data[winningPrizeId] = (prizeCache.data[winningPrizeId] || 0) + 1;
             }
 
-            return res.json({
+            res.json({
                 success: true,
                 status: 'PLAYER',
                 prize: winningPrizeName,
                 prize_id: winningPrizeId
             });
+
+            // 6. Update NocoDB (Async Background)
+            try {
+                await axios.patch(
+                    NOCODB_API_URL,
+                    {
+                        Id: record.Id,
+                        status: 'PLAYER',
+                        prize: winningPrizeName,
+                        prize_id: winningPrizeId
+                    },
+                    { headers: { 'xc-token': NOCODB_TOKEN } }
+                );
+            } catch (bgError) {
+                console.error(`Background Update Failed for ${code}:`, bgError.message);
+                // We can't tell the user anymore, but we logged it.
+                // Revert cache? No, better safely count as used.
+            }
         }
 
     } catch (err) {
         console.error(err.response?.data || err.message);
-        res.status(500).json({ error: 'Update failed' });
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'Update failed' });
+        }
+    } finally {
+        // UNLOCK
+        processingLocks.delete(code);
     }
 });
 
