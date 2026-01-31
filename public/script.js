@@ -483,7 +483,14 @@ async function updateGameStatus(prizeName, prizeId, statusParam) {
         }
 
         if (!response.ok) {
-            throw new Error("Server error");
+            let errorMessage = "Server error";
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.error || errorMessage;
+            } catch (e) {
+                // Ignore JSON parse error, use default message
+            }
+            throw new Error(errorMessage);
         }
 
         const data = await response.json();

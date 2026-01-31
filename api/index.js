@@ -21,10 +21,15 @@ app.get('/health', (req, res) => {
 const NOCODB_API_URL = 'https://nocodb.smax.in/api/v2/tables/mkuczx2ud6zitcr/records';
 const NOCODB_TOKEN = process.env.NOCODB_TOKEN;
 
+if (!NOCODB_TOKEN) {
+    console.warn("WARNING: NOCODB_TOKEN is missing from environment variables.");
+}
+
 // ===== CHECK CONDITION =====
 app.get('/api/check', async (req, res) => {
     const { code } = req.query;
     if (!code) return res.status(400).json({ error: 'Missing random_code' });
+    if (!NOCODB_TOKEN) return res.status(500).json({ error: 'Server misconfiguration: Missing Token' });
 
     try {
         const whereClause = `(random_code,eq,${code})`;
@@ -143,6 +148,8 @@ app.post('/api/update', async (req, res) => {
     const { code, status } = req.body;
     // NOTE: We ignore 'prize' and 'prize_id' from client when status is PLAYER
     // because Server now decides the prize.
+
+    if (!NOCODB_TOKEN) return res.status(500).json({ error: 'Server misconfiguration: Missing Token' });
 
     if (!code) {
         return res.status(400).json({ error: 'Missing code' });
