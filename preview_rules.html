@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preview Thể Lệ</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .preview-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            /* Mobile width simulation */
+        }
+
+        .bg-img {
+            width: 100%;
+            display: block;
+        }
+
+        .scroll-area {
+            position: absolute;
+            /* Estimated positions based on the scroll graphic */
+            top: 14%;
+            left: 12%;
+            width: 76%;
+            height: 72%;
+            overflow-y: auto;
+            padding-right: 5px;
+
+            /* Custom Scrollbar for Chrome/Edge/Safari */
+            scrollbar-width: thin;
+            scrollbar-color: #d8a027 transparent;
+        }
+
+        .scroll-area::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .scroll-area::-webkit-scrollbar-thumb {
+            background-color: #d8a027;
+            border-radius: 3px;
+        }
+
+        .scroll-area::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .content-img {
+            width: 100%;
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="preview-container">
+        <!-- Background Image -->
+        <img src="assets/preview-bg.png" alt="Background" class="bg-img">
+
+        <!-- Scrollable Content Area -->
+        <div class="scroll-area">
+            <img src="assets/preview-content.png" alt="Content" class="content-img">
+        </div>
+    </div>
+
+</body>
+
+</html>

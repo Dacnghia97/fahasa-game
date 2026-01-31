@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Hái Lộc Đầu Xuân 2026</title>
+    <link rel="stylesheet" href="styles.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Roboto:wght@400;700&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+</head>
+
+<body>
+    <div id="home-page" class="app-container">
+        <!-- Main Background Decoration -->
+        <div class="bg-decoration"></div>
+
+        <!-- Header / Banner Area -->
+        <header class="main-header">
+            <!-- This image tag is a placeholder for the "Hái Lộc..." typography image -->
+            <div class="banner-placeholder">
+                <h1 class="title-text">HÁI LỘC<br>ĐẦU XUÂN<br><span class="year">2026</span></h1>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="game-area">
+            <div class="cards-container">
+                <!-- Card 1: Lì Xì -->
+                <div class="card card-lixi">
+                    <!-- Removed text badge if image has it, but user didn't say image has text. Keeping badge for now or removing if image looks self-sufficient? 
+                          User said "replace css... with image". 
+                          I will keep the badge text for now as the images were 168x148 which is smallish for a full card with text. -->
+                    <div class="card-header-badge" style="display:none">Chạm vào Bao lì xì</div>
+                    <div class="card-content">
+                        <img src="assets/card-lixi.png" alt="Bao lì xì" class="card-img">
+                    </div>
+                </div>
+
+                <!-- Card 2: Quà Tưởng -->
+                <div class="card card-gift">
+                    <div class="card-header-badge" style="display:none">Nhận phần thưởng</div>
+                    <div class="card-content">
+                        <img src="assets/card-reward.png" alt="Nhận phần thưởng" class="card-img">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status Message -->
+            <p id="player-status-msg"
+                style="color: white; font-weight: bold; text-align: center; margin: 10px 0; font-size: 1.2rem; display: none;">
+            </p>
+
+            <!-- Primary Action Button -->
+            <button class="btn btn-primary btn-img-mode" onclick="startProgram()">
+                <img src="assets/btn-start.png" alt="Bắt Đầu Ngay">
+            </button>
+
+            <!-- Secondary Action Buttons -->
+            <div class="secondary-actions">
+                <button class="btn btn-secondary btn-img-mode" onclick="showGifts()">
+                    <img src="assets/btn-gift.png" alt="Quà Tặng">
+                </button>
+                <button class="btn btn-secondary btn-img-mode" onclick="showRules()">
+                    <img src="assets/btn-rules.png" alt="Thể Lệ">
+                </button>
+            </div>
+        </main>
+
+        <!-- Footer Decoration -->
+        <footer class="footer-decoration">
+            <!-- Clouds SVG can go here -->
+        </footer>
+    </div>
+
+    <!-- Game Page -->
+    <div id="game-page" class="app-container" style="display: none; background-image: url('assets/bg-game.png');">
+        <!-- Game Header (Optional hidden title or similar to home) -->
+        <header class="game-header" style="height: 20dvh;"></header>
+
+        <!-- Envelopes Grid -->
+        <div class="envelopes-grid" id="envelopes-grid">
+            <div class="envelope-item" onclick="selectEnvelope(1)">
+                <img src="assets/envelope-1.png" alt="Lì Xì 1" class="envelope-img">
+            </div>
+            <div class="envelope-item" onclick="selectEnvelope(2)">
+                <img src="assets/envelope-2.png" alt="Lì Xì 2" class="envelope-img">
+            </div>
+            <div class="envelope-item" onclick="selectEnvelope(3)">
+                <img src="assets/envelope-3.png" alt="Lì Xì 3" class="envelope-img">
+            </div>
+            <div class="envelope-item" onclick="selectEnvelope(4)">
+                <img src="assets/envelope-4.png" alt="Lì Xì 4" class="envelope-img">
+            </div>
+            <div class="envelope-item" onclick="selectEnvelope(5)">
+                <img src="assets/envelope-5.png" alt="Lì Xì 5" class="envelope-img">
+            </div>
+            <div class="envelope-item" onclick="selectEnvelope(6)">
+                <img src="assets/envelope-6.png" alt="Lì Xì 6" class="envelope-img">
+            </div>
+        </div>
+
+        <!-- Mascot (as footer or absolute) -->
+        <!-- Based on reference, mascot is at the bottom. The background image likely contains it? 
+             User sent background image. Let's assume background image has the mascot. 
+             If not, we might need a separate mascot image.
+             Looking at the uploaded image 'uploaded_image_1769007623286.png', it seems to have the mascot at the bottom!
+             So we just need the grid. -->
+    </div>
+
+    <!-- Welcome Popup -->
+    <div id="welcome-popup" class="popup-overlay" style="display:none;">
+        <div class="popup-container">
+            <img src="assets/popup-notice.png" alt="Lưu ý" class="popup-note-img">
+            <button class="btn-popup-close" onclick="closePopup()">
+                <img src="assets/btn-understood.png" alt="Đã hiểu">
+            </button>
+        </div>
+    </div>
+
+    <!-- Gift Popup -->
+    <div id="popup-gift" class="popup-overlay" style="display:none;">
+        <div class="popup-container">
+            <img src="assets/popup-gift.png" alt="Quà Tặng" class="popup-note-img">
+            <button class="btn-popup-close" onclick="closePopup()">
+                <img src="assets/btn-understood.png" alt="Đã hiểu">
+            </button>
+        </div>
+    </div>
+
+    <!-- Rules Popup -->
+    <div id="popup-rules" class="popup-overlay" style="display:none;">
+        <div class="popup-container popup-rules-custom">
+            <div class="rules-bg-wrapper">
+                <img src="assets/popup-rules-bg.png" alt="Background" class="rules-bg-img">
+                <div class="rules-scroll-area">
+                    <img src="assets/popup-rules-content.png" alt="Nội dung thể lệ" class="rules-content-img">
+                </div>
+            </div>
+            <button class="btn-popup-close" onclick="closePopup()">
+                <img src="assets/btn-understood.png" alt="Đã hiểu">
+            </button>
+        </div>
+    </div>
+
+    <!-- Contact Popup (New) -->
+    <div id="popup-contact" class="popup-overlay" style="display:none;" onclick="closeSpecificPopup('popup-contact')">
+        <div class="popup-container" onclick="event.stopPropagation()">
+            <img src="assets/popup-contact.png" alt="Thông tin liên hệ" class="popup-note-img">
+
+            <div class="popup-actions" style="margin-top: 15px;">
+                <img src="assets/btn-view-rules.png" alt="Xem Thể Lệ" class="btn-popup-action"
+                    onclick="closeSpecificPopup('popup-contact'); showRules()">
+                <img src="assets/btn-home.png" alt="Màn hình chính" class="btn-popup-action"
+                    onclick="closeSpecificPopup('popup-contact'); goHome()">
+            </div>
+        </div>
+    </div>
+
+    <!-- Expired Popup -->
+    <div id="popup-expired" class="popup-overlay" style="display:none;">
+        <div class="popup-container">
+            <img src="assets/popup-expired.png" alt="Rất tiếc" class="popup-note-img">
+            <button class="btn-popup-close btn-sm" onclick="closeSpecificPopup('popup-expired'); showRules()">
+                <img src="assets/btn-view-rules.png" alt="Xem Thể Lệ">
+            </button>
+        </div>
+    </div>
+
+    <!-- Access Error Popup -->
+    <div id="popup-access-error" class="popup-overlay" style="display:none;">
+        <div class="popup-container">
+            <img src="assets/popup-access-error.png" alt="Lỗi Truy Cập" class="popup-note-img">
+            <button class="btn-popup-close" onclick="closeSpecificPopup('popup-access-error'); goHome()">
+                <img src="assets/btn-understood.png" alt="Đã hiểu">
+            </button>
+        </div>
+    </div>
+
+    <!-- Opening Status Popup (New) -->
+    <div id="popup-opening" class="popup-overlay" style="display:none;" onclick="closeSpecificPopup('popup-opening')">
+        <div class="popup-container" onclick="event.stopPropagation()">
+            <img src="assets/popup-opening.png" alt="Hết lượt" class="popup-note-img">
+            <div class="popup-actions" style="margin-top: 15px;">
+                <div id="btn-contact-opening" class="btn-popup-action"
+                    onclick="showContactInfo(); closeSpecificPopup('popup-opening')">
+                    <img src="assets/btn-contact.png" alt="Liên hệ">
+                </div>
+                <div class="btn-popup-action" onclick="closeSpecificPopup('popup-opening'); goHome()">
+                    <img src="assets/btn-home.png" alt="Màn hình chính">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Result Popup (Moved Global) -->
+    <div id="result-popup" class="popup-overlay" style="display: none;">
+        <div class="popup-container animate-popup">
+            <img src="assets/popup-gift.png" alt="Phần quà" class="popup-note-img" id="result-image">
+            <div id="result-note" class="result-note"></div>
+            <div class="popup-actions">
+                <a href="https://www.fahasa.com/tryout/history/" id="btn-fpoint" class="btn-popup-action"
+                    style="display: none;">
+                    <img src="assets/btn-fpoint.png" alt="Ví F-point">
+                </a>
+                <div id="btn-contact" class="btn-popup-action" style="display: none;" onclick="showContactInfo()">
+                    <img src="assets/btn-contact.png" alt="Liên hệ">
+                </div>
+                <img src="assets/btn-home.png" alt="Màn hình chính" class="btn-popup-action" onclick="goHome()">
+            </div>
+            <div class="popup-close-btn" onclick="closeResultPopup()"></div>
+        </div>
+    </div>
+
+    <script src="script.js?v=cheat_protect_1"></script>
+</body>
+
+</html>
