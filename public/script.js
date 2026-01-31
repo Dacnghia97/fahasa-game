@@ -5,7 +5,14 @@ const API_URL = '/api/check';
 // Utility to get query params
 function getQueryParam(param) {
     const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get(param);
+    let value = urlParams.get(param);
+    
+    // Fallback: Check hash if not found in search
+    if (!value && window.location.hash.includes('?')) {
+        const hashParams = new URLSearchParams(window.location.hash.split('?')[1]);
+        value = hashParams.get(param);
+    }
+    return value;
 }
 
 // Function to check game condition via Backend API
@@ -215,6 +222,13 @@ async function startProgram() {
 
     console.log("User clicked Start");
     const code = getQueryParam('random_code');
+
+    if (!code) {
+        // Show Access Error Popup
+        const popup = document.getElementById('popup-access-error');
+        if (popup) popup.style.display = 'flex';
+        return;
+    }
 
     const btnStart = document.querySelector('.btn-primary');
     if (btnStart) {
