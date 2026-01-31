@@ -379,7 +379,7 @@ body {
 /* Specific fix for Game Page Background */
 #game-page {
     /* "Giãn tự động" - Stretch to fill */
-    background-size: cover !important;
+    background-size: contain !important;
     background-position: center !important;
     background-repeat: no-repeat !important;
     /* Ensure it hits the edges */
