@@ -89,7 +89,7 @@ async function checkGameCondition() {
         }
     } catch (error) {
         console.error("Lỗi kết nối đến server:", error);
-        alert("Có lỗi xảy ra khi kiểm tra điều kiện chơi. Vui lòng thử lại sau.");
+        // alert("Có lỗi xảy ra khi kiểm tra điều kiện chơi. Vui lòng thử lại sau.");
         return false;
     }
 }
@@ -265,6 +265,8 @@ async function startProgram() {
         showOpeningPopup();
         return;
     }
+
+    const btnStart = document.querySelector('.btn-primary');
     if (btnStart) {
         btnStart.style.opacity = '0.7';
         btnStart.style.pointerEvents = 'none'; // Disable clicks
