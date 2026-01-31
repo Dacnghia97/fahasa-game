@@ -9,7 +9,8 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
-// app.use(express.static(path.join(__dirname)));
+// Serve static files from the public directory (for local development)
+app.use(express.static(path.join(__dirname, '../public')));
 
 // ===== HEALTH CHECK =====
 app.get('/health', (req, res) => {
