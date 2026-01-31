@@ -371,9 +371,14 @@ body {
     position: relative;
     width: 90%;
     max-width: 400px;
-    display: flex;
-    flex-direction: column;
     align-items: center;
+}
+
+/* Specific fix for Game Page Background */
+#game-page {
+    background-size: cover !important;
+    background-position: center bottom !important;
+    background-repeat: no-repeat !important;
 }
 
 /* --- Game Page Styles --- */
