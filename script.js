@@ -228,6 +228,7 @@ async function startProgram() {
     }
 
     isProcessing = true;
+    let canPlay = null;
 
     try {
         // --- STRICT START BLOCKING ---
@@ -242,6 +243,9 @@ async function startProgram() {
             if (success) {
                 // We successfully claimed the OPENNING status
                 localStorage.setItem(sessionKey, 'true');
+                // OPTIMIZATION: We know we are now OPENNING and valid owners.
+                // Reset condition manually to skip redundant API call
+                canPlay = true;
             } else {
                 // Failed (likely someone else started).
                 // Show blocked popup and Exit.
@@ -256,8 +260,10 @@ async function startProgram() {
         }
         // -----------------------------
 
-        // Check condition before entering
-        const canPlay = await checkGameCondition();
+        // Check condition before entering (Only if we didn't just set it)
+        if (canPlay === null) {
+            canPlay = await checkGameCondition();
+        }
 
         if (canPlay === true) {
             // Transition to Game Page
@@ -523,9 +529,7 @@ async function showResult(envelopeId) {
     if (result && result.success && result.prize_id) {
         // Check if this is an existing prize (Concurrent tab access)
         if (result.is_existing) {
-            alert("Bạn đã nhận quà ở phiên khác! Vui lòng kiểm tra lại.");
-            currentUserPrize = result.prize_id; // Set this so goHome updates button
-            goHome();
+            showOpeningPopup();
             return;
         }
 

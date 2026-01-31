@@ -65,8 +65,20 @@ const PRIZE_NAMES = {
     'prize-5': '10.000 F-point'
 };
 
+// Prize Cache
+let prizeCache = {
+    data: null,
+    lastFetch: 0,
+    TTL: 15000 // 15 seconds
+};
+
 // Helper: Get Current Prize Counts from NocoDB
 async function getPrizeCounts() {
+    // Return cached data if valid
+    if (prizeCache.data && (Date.now() - prizeCache.lastFetch < prizeCache.TTL)) {
+        return prizeCache.data;
+    }
+
     const counts = {};
     const promises = Object.keys(PRIZE_LIMITS).map(async (prizeId) => {
         try {
@@ -86,6 +98,11 @@ async function getPrizeCounts() {
         }
     });
     await Promise.all(promises);
+
+    // Update Cache
+    prizeCache.data = counts;
+    prizeCache.lastFetch = Date.now();
+
     return counts;
 }
 
@@ -202,6 +219,12 @@ app.post('/api/update', async (req, res) => {
             console.log(`User ${code} won ${winningPrizeId} (${winningPrizeName})`);
 
             // 5. Return Prize to Client
+
+            // Update Cache Immediately
+            if (winningPrizeId && prizeCache.data) {
+                prizeCache.data[winningPrizeId] = (prizeCache.data[winningPrizeId] || 0) + 1;
+            }
+
             return res.json({
                 success: true,
                 status: 'PLAYER',
