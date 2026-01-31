@@ -47,9 +47,7 @@ app.get('/api/check', async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 });
-
-// ===== UPDATE STATUS =====
-// ===== UPDATE STATUS =====
+// ===== UPDATE STATUS & PLAY GAME =====
 // ===== PRIZE CONFIGURATION =====
 // Adjust limits via Environment Variables on Railway
 // Defaults are set to Production values
@@ -81,13 +79,10 @@ async function getPrizeCounts() {
                 }
             });
             // NocoDB V2 usually returns { list: [], pageInfo: { totalRows: 10 } }
-            // If structure is different, fallback to 0. 
-            // Note: If project doesn't return pageInfo by default, we might need a different approach.
-            // Assuming standard response here based on typical NocoDB usage.
             counts[prizeId] = res.data.pageInfo?.totalRows ?? 0;
         } catch (e) {
             console.error(`Error counting ${prizeId}:`, e.message);
-            counts[prizeId] = 0; // Safe fallback, though risky for limits
+            counts[prizeId] = 0;
         }
     });
     await Promise.all(promises);
@@ -126,7 +121,6 @@ function pickRandomPrize(currentCounts) {
     return availablePrizes[availablePrizes.length - 1].id; // Fallback
 }
 
-// ===== UPDATE STATUS & PLAY GAME =====
 app.post('/api/update', async (req, res) => {
     const { code, status } = req.body;
     // NOTE: We ignore 'prize' and 'prize_id' from client when status is PLAYER
@@ -170,7 +164,8 @@ app.post('/api/update', async (req, res) => {
                     success: true,
                     status: 'PLAYER',
                     prize: record.prize,
-                    prize_id: record.prize_id
+                    prize_id: record.prize_id,
+                    is_existing: true // Flag to tell client this is an old prize
                 });
             }
 

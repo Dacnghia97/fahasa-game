@@ -172,6 +172,37 @@ let currentUserPrize = null; // Store prize if player has already played
 let pendingPlayerPrize = null; // Store prize temporarily for PLAYER status flow
 let isOutOfStock = false; // Flag for Out of Stock state
 
+function showReviewPopup(prizeId) {
+    const prizeData = getPrizeConfig(prizeId);
+    if (!prizeData) return;
+
+    const popup = document.getElementById('result-popup');
+    const resultImage = document.getElementById('result-image');
+    const noteElement = document.getElementById('result-note');
+    const btnFpoint = document.getElementById('btn-fpoint');
+    const btnContact = document.getElementById('btn-contact');
+
+    // Reset buttons
+    if (btnFpoint) btnFpoint.style.display = 'none';
+    if (btnContact) btnContact.style.display = 'none';
+
+    if (popup && resultImage) {
+        resultImage.src = prizeData.src;
+        resultImage.style.display = 'block';
+
+        if (noteElement) noteElement.innerText = prizeData.note || '';
+
+        // Show relevant button
+        if (prizeData.type === 'fpoint' && btnFpoint) {
+            btnFpoint.style.display = 'flex';
+        } else if (prizeData.type === 'computer' && btnContact) {
+            btnContact.style.display = 'flex';
+        }
+
+        popup.style.display = 'flex';
+    }
+}
+
 async function startProgram() {
     if (isProcessing) return;
 
@@ -490,6 +521,14 @@ async function showResult(envelopeId) {
     }
 
     if (result && result.success && result.prize_id) {
+        // Check if this is an existing prize (Concurrent tab access)
+        if (result.is_existing) {
+            alert("Bạn đã nhận quà ở phiên khác! Vui lòng kiểm tra lại.");
+            currentUserPrize = result.prize_id; // Set this so goHome updates button
+            goHome();
+            return;
+        }
+
         // Success! We have a prize from server.
         const prizeId = result.prize_id;
         const prizeData = getPrizeConfig(prizeId); // Reuse existing helper to find config
@@ -519,12 +558,14 @@ async function showResult(envelopeId) {
 
                 popup.style.display = 'flex';
 
-                // Trigger Fireworks
-                triggerFireworks();
+                // Trigger Fireworks ONLY IF NOT EXISTING
+                if (!result.is_existing) {
+                    triggerFireworks();
+                }
             }
         } else {
             // Can't find config for this prize ID?
-            alert("Chúc mừng bạn trúng: " + result.prize + ". (Lỗi hiển thị: Không tìm thấy hình ảnh)");
+            alert("Chúc mừng bạn trúng: " + (result.prize || "Quà bí ẩn") + ". (Lỗi hiển thị: Không tìm thấy hình ảnh)");
         }
     } else {
         // Failed (Cheat, Error, or Out of Stock)
