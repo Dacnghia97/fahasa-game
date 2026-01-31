@@ -84,6 +84,9 @@ let prizeCache = {
     TTL: 15000 // 15 seconds
 };
 
+// In-memory Lock for Concurrency Control (Single Instance)
+const processingCodes = new Set();
+
 // Helper: Get Current Prize Counts from NocoDB
 async function getPrizeCounts() {
     // Return cached data if valid
@@ -166,6 +169,14 @@ app.post('/api/update', async (req, res) => {
         return res.status(400).json({ error: 'Invalid code format' });
     }
 
+    // CONCURRENCY LOCK: Prevent same code from being processed multiple times simultaneously
+    if (processingCodes.has(code)) {
+        return res.status(429).json({ error: 'Request is being processed. Please wait.' });
+    }
+    
+    // Acquire Lock
+    processingCodes.add(code);
+
     const targetStatus = status || 'PLAYER';
 
     try {
@@ -177,7 +188,9 @@ app.post('/api/update', async (req, res) => {
         });
 
         const record = findRes.data.list?.[0];
-        if (!record) return res.status(404).json({ error: 'Record not found' });
+        if (!record) {
+            return res.status(404).json({ error: 'Record not found' });
+        }
 
         // 2. Cheat Protection Logic
         if (targetStatus === 'OPENNING') {
@@ -270,6 +283,9 @@ app.post('/api/update', async (req, res) => {
     } catch (err) {
         console.error(err.response?.data || err.message);
         res.status(500).json({ error: 'Update failed' });
+    } finally {
+        // Release Lock
+        processingCodes.delete(code);
     }
 });
 
