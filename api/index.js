@@ -173,7 +173,12 @@ app.post('/api/update', async (req, res) => {
                 // But typically client handles that. Server blocks strictly.
                 // Unless it's the SAME device re-sending? 
                 // For safety: strict block.
-                return res.status(409).json({ error: 'Start blocked', currentStatus: record.status });
+                const response = { error: 'Start blocked', currentStatus: record.status };
+                if (record.status === 'PLAYER') {
+                    response.prize = record.prize;
+                    response.prize_id = record.prize_id;
+                }
+                return res.status(409).json(response);
             }
             // Just update status to OPENNING
             await axios.patch(NOCODB_API_URL, { Id: record.Id, status: 'OPENNING' }, { headers: { 'xc-token': NOCODB_TOKEN } });

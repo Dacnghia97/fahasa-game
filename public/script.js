@@ -301,7 +301,29 @@ async function startProgram() {
         }
 
         if (!result || !result.success) {
-            console.error("Failed to start game session");
+            console.error("Failed to start game session", result);
+            
+            // Handle PLAYER conflict (Already played)
+            if (result && result.currentStatus === 'PLAYER') {
+                 // User already played.
+                 // Update local state
+                 currentUserPrize = result.prize_id || result.prize;
+                 // Reset processing
+                 isProcessing = false;
+                 if (btnStart) {
+                     btnStart.style.opacity = '1';
+                     btnStart.style.pointerEvents = 'auto';
+                     // Switch to Review Button style if needed?
+                     const btnImg = btnStart.querySelector('img');
+                     if (btnImg) {
+                        btnImg.src = 'assets/btn-review.png';
+                        btnImg.alt = 'Xem lại quà';
+                     }
+                 }
+                 showReviewPopup(currentUserPrize);
+                 return;
+            }
+
             // If it failed, maybe code is invalid or network error
              if (btnStart) {
                 btnStart.style.opacity = '1';
@@ -314,7 +336,9 @@ async function startProgram() {
                  const popup = document.getElementById('result-popup');
                  if (popup) popup.style.display = 'flex';
             } else {
-                 alert("Không thể bắt đầu game. Vui lòng thử lại sau.");
+                 // Add detailed error if available
+                 const errorMsg = (result && result.error) ? result.error : "Không thể bắt đầu game. Vui lòng thử lại sau.";
+                 alert(errorMsg);
             }
             return;
         }
@@ -445,7 +469,12 @@ async function updateGameStatus(prizeName, prizeId, statusParam) {
 
         if (response.status === 409) {
             console.warn("Cheat detected or status changed externally.");
-            return null; // Failed
+            try {
+                const data = await response.json();
+                return { success: false, ...data };
+            } catch (e) {
+                return null;
+            }
         }
 
         if (response.status === 422) {
