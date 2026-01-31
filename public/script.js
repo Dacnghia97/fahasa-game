@@ -12,7 +12,7 @@ function getQueryParam(param) {
         const hashParams = new URLSearchParams(window.location.hash.split('?')[1]);
         value = hashParams.get(param);
     }
-    return value;
+    return value ? value.trim() : null;
 }
 
 // Function to check game condition via Backend API
@@ -27,9 +27,10 @@ async function checkGameCondition() {
     }
 
     try {
-        const response = await fetch(`${API_URL}?code=${code}`);
-        const data = await response.json();
+        const response = await fetch(`${API_URL}?code=${encodeURIComponent(code)}&t=${Date.now()}`);
+        if (!response.ok) throw new Error("API check failed");
 
+        const data = await response.json();
         if (data.valid) {
             if (data.status === 'INVITED') {
                 return true; // Allowed to play
@@ -60,9 +61,30 @@ async function checkGameCondition() {
                 return false;
             }
         } else {
-            // Invalid code -> Show Access Error Popup
-            const popup = document.getElementById('popup-access-error');
-            if (popup) popup.style.display = 'flex';
+            // Invalid code -> Show Invalid Code Message
+            isInvalidCode = true;
+            
+            // Use result-popup to show specific error message
+            const popup = document.getElementById('result-popup');
+            const resultImage = document.getElementById('result-image');
+            const noteElement = document.getElementById('result-note');
+            
+            if (popup && noteElement) {
+                if (resultImage) resultImage.style.display = 'none'; // Hide gift image
+                noteElement.innerHTML = "Mã tham dự không hợp lệ hoặc không tồn tại.<br>Vui lòng kiểm tra lại.";
+                
+                // Hide other buttons
+                const btnFpoint = document.getElementById('btn-fpoint');
+                const btnContact = document.getElementById('btn-contact');
+                if (btnFpoint) btnFpoint.style.display = 'none';
+                if (btnContact) btnContact.style.display = 'none';
+                
+                popup.style.display = 'flex';
+            } else {
+                // Fallback to generic error
+                const popupError = document.getElementById('popup-access-error');
+                if (popupError) popupError.style.display = 'flex';
+            }
             return false;
         }
     } catch (error) {
@@ -173,6 +195,7 @@ let isProcessing = false;
 let currentUserPrize = null; // Store prize if player has already played
 let pendingPlayerPrize = null; // Store prize temporarily for PLAYER status flow
 let isOutOfStock = false; // Flag for Out of Stock state
+let isInvalidCode = false; // Flag for Invalid Code state
 
 function showReviewPopup(prizeId) {
     const prizeData = getPrizeConfig(prizeId);
@@ -230,7 +253,18 @@ async function startProgram() {
         return;
     }
 
-    const btnStart = document.querySelector('.btn-primary');
+    // Check Invalid Code
+    if (isInvalidCode) {
+         const popup = document.getElementById('result-popup');
+         if (popup) popup.style.display = 'flex';
+         return;
+    }
+
+    // Then check out of stock
+    if (isOutOfStock) {
+        showOpeningPopup();
+        return;
+    }
     if (btnStart) {
         btnStart.style.opacity = '0.7';
         btnStart.style.pointerEvents = 'none'; // Disable clicks
@@ -244,105 +278,68 @@ async function startProgram() {
         // Check if we already own this session
         const sessionKey = 'started_' + code;
         const isOwner = localStorage.getItem(sessionKey);
+        
+        // Always try to start on server (Idempotent)
+        // If !isOwner, we are starting fresh or new tab
+        // If isOwner, we are just continuing
+        
+        // Attempt to mark as OPENNING
+        // If code is invalid, this will likely fail or return error
+        const result = await updateGameStatus(null, null, 'OPENNING');
 
-        if (!isOwner) {
-            // Attempt to mark as OPENNING
-            const success = await updateGameStatus(null, null, 'OPENNING');
-
-            if (success) {
-                // We successfully claimed the OPENNING status
-                localStorage.setItem(sessionKey, 'true');
-                // OPTIMIZATION: We know we are now OPENNING and valid owners.
-                // Reset condition manually to skip redundant API call
-                canPlay = true;
-            } else {
-                // Failed (likely someone else started).
-                // Show blocked popup and Exit.
-                showOpeningPopup();
-                isProcessing = false;
-                if (btnStart) {
-                    btnStart.style.opacity = '1';
-                    btnStart.style.pointerEvents = 'auto';
-                }
-                return;
-            }
-        }
-        // -----------------------------
-
-        // Check condition before entering (Only if we didn't just set it)
-        if (canPlay === null) {
-            canPlay = await checkGameCondition();
-        }
-
-        if (canPlay === true) {
-            // Transition to Game Page
-            const homePage = document.getElementById('home-page');
-            const gamePage = document.getElementById('game-page');
-
-            if (homePage && gamePage) {
-                homePage.style.display = 'none';
-                gamePage.style.display = 'flex';
-            }
-            setTimeout(() => { isProcessing = false; }, 500);
-        } else if (canPlay === 'PLAYER_NOTICE_PENDING') {
-            // Show Notice Popup for Player Status
-            const popup = document.getElementById('welcome-popup');
-            if (popup) {
-                // Override Close Button to Show "Out of Turns" msg
-                const closeBtn = popup.querySelector('.btn-popup-close');
-                // Remove old event listener is hard without reference, so we'll clone it? or just set onclick attribute
-                // Simple onclick replacement:
-                if (closeBtn) {
-                    // Need to reset this later to avoid affecting normal flow? 
-                    // Actually welcome-popup is usually just "Close".
-                    closeBtn.onclick = function () {
-                        closeSpecificPopup('welcome-popup');
-                        // Show "Out of turns" message
-                        const msg = document.getElementById('player-status-msg');
-                        if (msg) {
-                            msg.innerText = "Bạn đã hết lượt chơi";
-                            msg.style.display = 'block';
-                        }
-
-                        // Move pending prize to current prize
-                        if (pendingPlayerPrize) {
-                            currentUserPrize = pendingPlayerPrize;
-                            pendingPlayerPrize = null;
-                        }
-
-                        // Also switch button to Review if we have a prize?
-                        if (currentUserPrize) {
-                            const btnStart = document.querySelector('.btn-primary');
-                            if (btnStart) {
-                                const btnImg = btnStart.querySelector('img');
-                                if (btnImg) {
-                                    btnImg.src = 'assets/btn-review.png';
-                                    btnImg.alt = 'Xem lại quà';
-                                }
-                            }
-                        }
-                    };
-                }
-                popup.style.display = 'flex';
-            }
-            isProcessing = false;
-        } else if (canPlay === 'OPENNING') {
-            // Show Opening Popup
+        if (result === 'OUT_OF_STOCK') {
+            isOutOfStock = true;
             showOpeningPopup();
             isProcessing = false;
-        } else {
+            if (btnStart) {
+                btnStart.style.opacity = '1';
+                btnStart.style.pointerEvents = 'auto';
+            }
+            return;
+        }
+
+        if (!result || !result.success) {
+            console.error("Failed to start game session");
+            // If it failed, maybe code is invalid or network error
+             if (btnStart) {
+                btnStart.style.opacity = '1';
+                btnStart.style.pointerEvents = 'auto';
+            }
             isProcessing = false;
+            
+            // Show error if we can deduce it
+            if (isInvalidCode) {
+                 const popup = document.getElementById('result-popup');
+                 if (popup) popup.style.display = 'flex';
+            } else {
+                 alert("Không thể bắt đầu game. Vui lòng thử lại sau.");
+            }
+            return;
         }
+
+        // Success: Mark ownership
+        localStorage.setItem(sessionKey, 'true');
+        
+        // Hide Home, Show Game
+        document.getElementById('home-page').style.display = 'none';
+        document.getElementById('game-page').style.display = 'block';
+
+        // Trigger confetti
+        confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 }
+        });
+
     } catch (e) {
-        console.error(e);
-        isProcessing = false;
-    } finally {
-        // If we are pending notice, button stays faded? No, we reset it.
-        if (btnStart && !isProcessing) {
-            // Reset button if we didn't start game (e.g. invalid, or now showing Review button)
+        console.error("Start program error:", e);
+        alert("Đã có lỗi xảy ra. Vui lòng tải lại trang.");
+        if (btnStart) {
             btnStart.style.opacity = '1';
-            btnStart.style.pointerEvents = 'auto'; // Re-enable so they can click "Review"
+            btnStart.style.pointerEvents = 'auto';
         }
+    } finally {
+        isProcessing = false;
     }
 }
 
