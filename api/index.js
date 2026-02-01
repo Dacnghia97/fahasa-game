@@ -275,12 +275,12 @@ app.post('/api/update', async (req, res) => {
             // This reduces the chance of 1000 requests hitting the DB check at the exact same millisecond
             await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 400) + 100));
 
-            // DISTRIBUTED LOCK (via NocoDB 'note' field)
+            // DISTRIBUTED LOCK (via NocoDB 'order_status' field)
             // This prevents the same code from being processed by multiple server instances
             const lockId = `LOCK-${Date.now()}-${Math.random().toString(36).substring(7)}`;
             
             // 1. Check if already locked by another request (and not expired)
-            if (record.note && record.note.startsWith('LOCK-')) {
+            if (record.order_status && record.order_status.startsWith('LOCK-')) {
                 // Check if lock is stale (assume stale if > 30s)
                 const lastUpdated = new Date(record.UpdatedAt).getTime();
                 if (Date.now() - lastUpdated < 30000) {
@@ -292,14 +292,15 @@ app.post('/api/update', async (req, res) => {
 
             // 2. Attempt to Acquire Lock
             try {
+                // console.log(`[${code}] Attempting to LOCK with ${lockId}...`);
                 await axios.patch(NOCODB_API_URL, { 
                     Id: record.Id, 
-                    note: lockId 
+                    order_status: lockId 
                 }, { headers: { 'xc-token': NOCODB_TOKEN } });
                 
                 // 3. Verify Lock Ownership with Polling (Retry for Propagation Delay)
                 let lockAcquired = false;
-                let lastNote = null;
+                let lastStatus = null;
                 for (let i = 0; i < 10; i++) { // Retry 10 times (approx 5s)
                     await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms
                     
@@ -309,24 +310,25 @@ app.post('/api/update', async (req, res) => {
                     });
                     
                     const lockedRecord = verifyLockRes.data.list?.[0];
-                    lastNote = lockedRecord?.note;
+                    lastStatus = lockedRecord?.order_status;
+                    // console.log(`[${code}] Retry ${i+1}: Status in DB is '${lastStatus}' (Expected: '${lockId}')`);
 
-                    if (lockedRecord && lockedRecord.note === lockId) {
+                    if (lockedRecord && lockedRecord.order_status === lockId) {
                         lockAcquired = true;
                         break;
                     }
                     
-                    if (lockedRecord && lockedRecord.note && lockedRecord.note.startsWith('LOCK-') && lockedRecord.note !== lockId) {
-                        console.warn(`User ${code} LOST LOCK to ${lockedRecord.note}. Aborting.`);
-                        return res.status(429).json({ error: `Request is being processed. Please wait. (Lost Lock to ${lockedRecord.note})` });
+                    if (lockedRecord && lockedRecord.order_status && lockedRecord.order_status.startsWith('LOCK-') && lockedRecord.order_status !== lockId) {
+                        console.warn(`User ${code} LOST LOCK to ${lockedRecord.order_status}. Aborting.`);
+                        return res.status(429).json({ error: `Request is being processed. Please wait. (Lost Lock to ${lockedRecord.order_status})` });
                     }
                     
-                    // If note is null or old value, it means DB hasn't updated yet. Continue waiting.
+                    // If status is null or old value, it means DB hasn't updated yet. Continue waiting.
                 }
                 
                 if (!lockAcquired) {
                     console.warn(`User ${code} FAILED to verify lock after retries. Propagation too slow.`);
-                    return res.status(429).json({ error: `Request is being processed. Please wait. (Lock Timeout. Last Note: ${lastNote})` });
+                    return res.status(429).json({ error: `Request is being processed. Please wait. (Lock Timeout. Last Status: ${lastStatus})` });
                 }
 
             } catch (lockError) {
