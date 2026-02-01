@@ -87,6 +87,17 @@ let prizeCache = {
 // In-memory Lock for Concurrency Control (Single Instance)
 const processingCodes = new Set();
 
+// GLOBAL MUTEX for Prize Allocation (Prevent Race Condition between users)
+// Simple Promise-based Queue to serialize critical section
+let prizeAllocationMutex = Promise.resolve();
+
+function withPrizeLock(task) {
+    const result = prizeAllocationMutex.then(() => task());
+    // Catch errors so the queue doesn't stall, but we let the caller handle the error via the returned promise
+    prizeAllocationMutex = result.catch(() => {});
+    return result;
+}
+
 // Helper: Get Current Prize Counts from NocoDB
 async function getPrizeCounts() {
     // Return cached data if valid
@@ -238,45 +249,74 @@ app.post('/api/update', async (req, res) => {
                 return res.status(409).json({ error: 'Check blocked', currentStatus: record.status });
             }
 
-            // 3. LOTTERY LOGIC (Server Side)
-            const currentCounts = await getPrizeCounts();
-            const winningPrizeId = pickRandomPrize(currentCounts);
+            // 3. LOTTERY LOGIC (Server Side) - WRAPPED IN GLOBAL MUTEX
+            // Critical Section: Read Count -> Check Limit -> Update DB
+            // Only ONE request can execute this block at a time.
+            const allocationResult = await withPrizeLock(async () => {
+                // Double check status inside lock in case it changed while waiting
+                // (Optional but good practice if we were re-fetching record, 
+                // but here we rely on the fact that THIS code is locked by processingCodes per user,
+                // so we just need to protect the PRIZE COUNTS).
+                
+                // Force invalidation of cache to ensure fresh count in critical section
+                prizeCache.lastFetch = 0; 
+                
+                const currentCounts = await getPrizeCounts();
+                const winningPrizeId = pickRandomPrize(currentCounts);
 
-            if (!winningPrizeId) {
-                // Out of stock behavior
-                // Option A: Return specific error
-                // Option B: Give a fallback "consolation prize" (if config allows)
-                return res.status(422).json({ error: 'All prizes are out of stock!' });
+                if (!winningPrizeId) {
+                    return { success: false, error: 'OUT_OF_STOCK' };
+                }
+
+                const winningPrizeName = PRIZE_NAMES[winningPrizeId];
+
+                // 4. Update NocoDB (The Commit)
+                try {
+                     await axios.patch(
+                        NOCODB_API_URL,
+                        {
+                            Id: record.Id,
+                            status: 'PLAYER',
+                            prize: winningPrizeName,
+                            prize_id: winningPrizeId
+                        },
+                        { headers: { 'xc-token': NOCODB_TOKEN } }
+                    );
+                } catch (dbError) {
+                    console.error("DB Update Failed inside Lock:", dbError);
+                    return { success: false, error: 'DB_ERROR' };
+                }
+                
+                // Update Cache Immediately inside lock to reflect new state for next person
+                if (winningPrizeId && prizeCache.data) {
+                    prizeCache.data[winningPrizeId] = (prizeCache.data[winningPrizeId] || 0) + 1;
+                }
+
+                return { 
+                    success: true, 
+                    data: {
+                        status: 'PLAYER',
+                        prize: winningPrizeName,
+                        prize_id: winningPrizeId
+                    }
+                };
+            });
+
+            if (!allocationResult.success) {
+                if (allocationResult.error === 'OUT_OF_STOCK') {
+                     return res.status(422).json({ error: 'All prizes are out of stock!' });
+                }
+                return res.status(500).json({ error: 'Transaction failed' });
             }
 
-            const winningPrizeName = PRIZE_NAMES[winningPrizeId];
-
-            // 4. Update NocoDB
-            await axios.patch(
-                NOCODB_API_URL,
-                {
-                    Id: record.Id,
-                    status: 'PLAYER',
-                    prize: winningPrizeName,
-                    prize_id: winningPrizeId
-                },
-                { headers: { 'xc-token': NOCODB_TOKEN } }
-            );
-
-            console.log(`User ${code} won ${winningPrizeId} (${winningPrizeName})`);
-
-            // 5. Return Prize to Client
-
-            // Update Cache Immediately
-            if (winningPrizeId && prizeCache.data) {
-                prizeCache.data[winningPrizeId] = (prizeCache.data[winningPrizeId] || 0) + 1;
-            }
+            const resultData = allocationResult.data;
+            console.log(`User ${code} won ${resultData.prize_id} (${resultData.prize})`);
 
             return res.json({
                 success: true,
                 status: 'PLAYER',
-                prize: winningPrizeName,
-                prize_id: winningPrizeId
+                prize: resultData.prize,
+                prize_id: resultData.prize_id
             });
         }
 
