@@ -205,7 +205,8 @@ app.post('/api/update', async (req, res) => {
 
     // CONCURRENCY LOCK: Prevent same code from being processed multiple times simultaneously
     if (processingCodes.has(code)) {
-        return res.status(429).json({ error: 'Request is being processed. Please wait.' });
+        console.warn(`[${code}] Blocked by Memory Lock`);
+        return res.status(429).json({ error: 'Request is being processed. Please wait. (Memory)' });
     }
     
     // Acquire Lock
@@ -284,7 +285,7 @@ app.post('/api/update', async (req, res) => {
                 const lastUpdated = new Date(record.UpdatedAt).getTime();
                 if (Date.now() - lastUpdated < 30000) {
                      console.warn(`User ${code} is LOCKED by another request. Rejecting.`);
-                     return res.status(429).json({ error: 'Request is being processed. Please wait.' });
+                     return res.status(429).json({ error: 'Request is being processed. Please wait. (Stale Lock)' });
                 }
                 console.warn(`User ${code} has STALE lock. Taking over.`);
             }
@@ -309,7 +310,7 @@ app.post('/api/update', async (req, res) => {
                 if (!lockedRecord || lockedRecord.note !== lockId) {
                     // Lost the lock to another concurrent request
                     console.warn(`User ${code} LOST LOCK (Current: ${lockedRecord?.note}). Aborting.`);
-                    return res.status(429).json({ error: 'Request is being processed. Please wait.' });
+                    return res.status(429).json({ error: 'Request is being processed. Please wait. (Lost Lock)' });
                 }
                 
                 // I HAVE THE LOCK. PROCEED.
