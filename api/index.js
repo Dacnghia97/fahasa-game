@@ -258,8 +258,10 @@ app.post('/api/update', async (req, res) => {
                 // but here we rely on the fact that THIS code is locked by processingCodes per user,
                 // so we just need to protect the PRIZE COUNTS).
                 
-                // Force invalidation of cache to ensure fresh count in critical section
-                prizeCache.lastFetch = 0; 
+                // CRITICAL FIX: Do NOT invalidate cache here. 
+                // We rely on the in-memory cache being updated sequentially by previous users in this Lock.
+                // Fetching from DB again risks reading stale data due to DB consistency lag.
+                // prizeCache.lastFetch = 0; <--- REMOVED
                 
                 const currentCounts = await getPrizeCounts();
                 const winningPrizeId = pickRandomPrize(currentCounts);
@@ -288,8 +290,11 @@ app.post('/api/update', async (req, res) => {
                 }
                 
                 // Update Cache Immediately inside lock to reflect new state for next person
+                // This ensures the next person in the queue sees the incremented count instantly
                 if (winningPrizeId && prizeCache.data) {
                     prizeCache.data[winningPrizeId] = (prizeCache.data[winningPrizeId] || 0) + 1;
+                    // Extend TTL to keep this fresh data valid for the next burst of requests
+                    prizeCache.lastFetch = Date.now(); 
                 }
 
                 return { 
