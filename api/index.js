@@ -98,6 +98,20 @@ function withPrizeLock(task) {
     return result;
 }
 
+// Helper: Retry Operation with Exponential Backoff
+async function retryOperation(operation, retries = 3, delay = 500) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            return await operation();
+        } catch (err) {
+            if (i === retries - 1) throw err;
+            const waitTime = delay * Math.pow(1.5, i); // Exponential backoff
+            console.warn(`Operation failed, retrying in ${waitTime}ms... (${i + 1}/${retries})`);
+            await new Promise(res => setTimeout(res, waitTime));
+        }
+    }
+}
+
 // Helper: Get Current Prize Counts from NocoDB
 async function getPrizeCounts() {
     // Return cached data if valid
@@ -109,20 +123,27 @@ async function getPrizeCounts() {
     const promises = Object.keys(PRIZE_LIMITS).map(async (prizeId) => {
         try {
             const whereClause = `(prize_id,eq,${prizeId})`;
-            const res = await axios.get(NOCODB_API_URL, {
-                headers: { 'xc-token': NOCODB_TOKEN },
-                params: {
-                    where: whereClause,
-                    limit: 1 // We only need the count metadata
-                }
-            });
-            // NocoDB V2 usually returns { list: [], pageInfo: { totalRows: 10 } }
-            counts[prizeId] = res.data.pageInfo?.totalRows ?? 0;
+            // Use Retry for Count to avoid false positives (0 count due to error)
+            await retryOperation(async () => {
+                const res = await axios.get(NOCODB_API_URL, {
+                    headers: { 'xc-token': NOCODB_TOKEN },
+                    params: {
+                        where: whereClause,
+                        limit: 1 // We only need the count metadata
+                    },
+                    timeout: 5000 // 5s timeout
+                });
+                // NocoDB V2 usually returns { list: [], pageInfo: { totalRows: 10 } }
+                counts[prizeId] = res.data.pageInfo?.totalRows ?? 0;
+            }, 3, 300);
         } catch (e) {
             console.error(`Error counting ${prizeId}:`, e.message);
-            counts[prizeId] = 0;
+            // CRITICAL: If we can't count, we MUST NOT assume 0. 
+            // We should throw to abort the allocation.
+            throw new Error(`Failed to count ${prizeId}`);
         }
     });
+    
     await Promise.all(promises);
 
     // Update Cache
@@ -303,17 +324,20 @@ app.post('/api/update', async (req, res) => {
                     // Only check if limit is small/critical
                     if (verifyLimit > 0) {
                         const verifyWhere = `(prize_id,eq,${winningPrizeId})`;
-                        const verifyRes = await axios.get(NOCODB_API_URL, {
-                            headers: { 'xc-token': NOCODB_TOKEN },
-                            params: { 
-                                where: verifyWhere, 
-                                limit: verifyLimit + 5, // Get a few more to see if we overflowed
-                                sort: 'updated_at' // Sort by time (NocoDB usually supports 'created_at' or 'updated_at')
-                            }
-                        });
                         
-                        const winners = verifyRes.data.list || [];
-                        const winnerCount = verifyRes.data.pageInfo?.totalRows || winners.length;
+                        let winnerCount = 0;
+                        await retryOperation(async () => {
+                            const verifyRes = await axios.get(NOCODB_API_URL, {
+                                headers: { 'xc-token': NOCODB_TOKEN },
+                                params: { 
+                                    where: verifyWhere, 
+                                    limit: verifyLimit + 5, // Get a few more to see if we overflowed
+                                    sort: 'updated_at' // Sort by time (NocoDB usually supports 'created_at' or 'updated_at')
+                                },
+                                timeout: 5000
+                            });
+                            winnerCount = verifyRes.data.pageInfo?.totalRows || verifyRes.data.list?.length || 0;
+                        }, 3, 500);
 
                         if (winnerCount > verifyLimit) {
                             console.warn(`OVERSOLD DETECTED for ${winningPrizeId}. Limit: ${verifyLimit}, Actual: ${winnerCount}. Initiating Re-allocation for ${code}`);
@@ -348,14 +372,18 @@ app.post('/api/update', async (req, res) => {
                                 try {
                                     const fallbackLimit = PRIZE_LIMITS[fallbackPrizeId];
                                     if (fallbackLimit > 0) {
-                                        const verifyFallbackRes = await axios.get(NOCODB_API_URL, {
-                                            headers: { 'xc-token': NOCODB_TOKEN },
-                                            params: { 
-                                                where: `(prize_id,eq,${fallbackPrizeId})`, 
-                                                limit: fallbackLimit + 5 
-                                            }
-                                        });
-                                        const fallbackCount = verifyFallbackRes.data.pageInfo?.totalRows ?? 0;
+                                        let fallbackCount = 0;
+                                        await retryOperation(async () => {
+                                            const verifyFallbackRes = await axios.get(NOCODB_API_URL, {
+                                                headers: { 'xc-token': NOCODB_TOKEN },
+                                                params: { 
+                                                    where: `(prize_id,eq,${fallbackPrizeId})`, 
+                                                    limit: fallbackLimit + 5 
+                                                },
+                                                timeout: 5000
+                                            });
+                                            fallbackCount = verifyFallbackRes.data.pageInfo?.totalRows ?? 0;
+                                        }, 3, 500);
                                         
                                         if (fallbackCount > fallbackLimit) {
                                             console.warn(`Double Oversell detected! ${code} failed re-allocation to ${fallbackPrizeId}. Voiding.`);
