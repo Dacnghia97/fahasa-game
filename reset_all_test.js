@@ -25,7 +25,7 @@ async function reset() {
                 prize: null,
                 prize_id: null,
                 note: null,
-                order_status: null
+                lock_status: null
             }, {
                 headers: { 'xc-token': NOCODB_TOKEN }
             });
@@ -36,7 +36,7 @@ async function reset() {
                 headers: { 'xc-token': NOCODB_TOKEN },
                 params: { where: `(Id,eq,${id})`, limit: 1 }
             });
-            console.log(`[VERIFY] ${code} OrderStatus:`, verifyRes.data.list[0].order_status);
+            console.log(`[VERIFY] ${code} LockStatus:`, verifyRes.data.list[0].lock_status);
         }
     }
     console.log('Reset Complete.');

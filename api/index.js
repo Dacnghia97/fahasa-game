@@ -275,12 +275,12 @@ app.post('/api/update', async (req, res) => {
             // This reduces the chance of 1000 requests hitting the DB check at the exact same millisecond
             await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 400) + 100));
 
-            // DISTRIBUTED LOCK (via NocoDB 'order_status' field)
+            // DISTRIBUTED LOCK (via NocoDB 'lock_status' field)
             // This prevents the same code from being processed by multiple server instances
             const lockId = `LOCK-${Date.now()}-${Math.random().toString(36).substring(7)}`;
             
             // 1. Check if already locked by another request (and not expired)
-            if (record.order_status && record.order_status.startsWith('LOCK-')) {
+            if (record.lock_status && record.lock_status.startsWith('LOCK-')) {
                 // Check if lock is stale (assume stale if > 30s)
                 const lastUpdated = new Date(record.UpdatedAt).getTime();
                 if (Date.now() - lastUpdated < 30000) {
@@ -295,7 +295,7 @@ app.post('/api/update', async (req, res) => {
                 // console.log(`[${code}] Attempting to LOCK with ${lockId}...`);
                 await axios.patch(NOCODB_API_URL, { 
                     Id: record.Id, 
-                    order_status: lockId 
+                    lock_status: lockId 
                 }, { headers: { 'xc-token': NOCODB_TOKEN } });
                 
                 // 3. Verify Lock Ownership with Polling (Retry for Propagation Delay)
@@ -313,17 +313,17 @@ app.post('/api/update', async (req, res) => {
                     });
                     
                     const lockedRecord = verifyLockRes.data.list?.[0];
-                    lastStatus = lockedRecord?.order_status;
+                    lastStatus = lockedRecord?.lock_status;
                     // console.log(`[${code}] Retry ${i+1}: Status in DB is '${lastStatus}' (Expected: '${lockId}')`);
 
-                    if (lockedRecord && lockedRecord.order_status === lockId) {
+                    if (lockedRecord && lockedRecord.lock_status === lockId) {
                         lockAcquired = true;
                         break;
                     }
                     
-                    if (lockedRecord && lockedRecord.order_status && lockedRecord.order_status.startsWith('LOCK-') && lockedRecord.order_status !== lockId) {
-                        console.warn(`User ${code} LOST LOCK to ${lockedRecord.order_status}. Aborting.`);
-                        return res.status(429).json({ error: `Request is being processed. Please wait. (Lost Lock to ${lockedRecord.order_status})` });
+                    if (lockedRecord && lockedRecord.lock_status && lockedRecord.lock_status.startsWith('LOCK-') && lockedRecord.lock_status !== lockId) {
+                        console.warn(`User ${code} LOST LOCK to ${lockedRecord.lock_status}. Aborting.`);
+                        return res.status(429).json({ error: `Request is being processed. Please wait. (Lost Lock to ${lockedRecord.lock_status})` });
                     }
                     
                     // If status is null or old value, it means DB hasn't updated yet. Continue waiting.
