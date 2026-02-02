@@ -301,7 +301,10 @@ app.post('/api/update', async (req, res) => {
                 // 3. Verify Lock Ownership with Polling (Retry for Propagation Delay)
                 let lockAcquired = false;
                 let lastStatus = null;
-                for (let i = 0; i < 10; i++) { // Retry 10 times (approx 5s)
+                // Wait a bit before first check to allow initial propagation
+                await new Promise(resolve => setTimeout(resolve, 800));
+
+                for (let i = 0; i < 20; i++) { // Retry 20 times (approx 10s)
                     await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms
                     
                     const verifyLockRes = await axios.get(NOCODB_API_URL, {
