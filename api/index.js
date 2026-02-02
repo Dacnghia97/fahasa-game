@@ -47,6 +47,17 @@ app.get('/api/check', async (req, res) => {
         const record = response.data.list?.[0];
         if (!record) return res.json({ valid: false });
 
+        // CORRECTION: If status is 'PLAYER' but prize is null (Zombie State),
+        // it implies a failed transaction. Reset view to 'INVITED' per user request.
+        if (record.status === 'PLAYER' && !record.prize) {
+            return res.json({
+                valid: true,
+                status: 'INVITED',
+                prize: null,
+                prize_id: null
+            });
+        }
+
         res.json({
             valid: true,
             status: record.status,
@@ -210,6 +221,7 @@ app.post('/api/update', async (req, res) => {
     processingCodes.add(code);
 
     const targetStatus = status || 'PLAYER';
+    let lockAcquiredGlobal = false;
 
     try {
         // 1. Find the Record
@@ -254,8 +266,12 @@ app.post('/api/update', async (req, res) => {
         }
 
         if (targetStatus === 'PLAYER') {
-            // If already played, return the existing prize (Don't roll again)
-            if (record.status === 'PLAYER') {
+            // CORRECTION: If previously failed (PLAYER + null), treat as INVITED
+            if (record.status === 'PLAYER' && !record.prize) {
+                // Allow to proceed as if INVITED
+            }
+            // If already played (and valid), return the existing prize (Don't roll again)
+            else if (record.status === 'PLAYER') {
                 return res.json({
                     success: true,
                     status: 'PLAYER',
@@ -266,7 +282,8 @@ app.post('/api/update', async (req, res) => {
             }
 
             // Ensure valid transition (must lie in OPENNING or INVITED)
-            if (record.status !== 'INVITED' && record.status !== 'OPENNING') {
+            // Note: If Zombie (PLAYER+null), we treat as INVITED, so we skip this check
+            if (record.status !== 'INVITED' && record.status !== 'OPENNING' && !(record.status === 'PLAYER' && !record.prize)) {
                 return res.status(409).json({ error: 'Check blocked', currentStatus: record.status });
             }
 
@@ -291,6 +308,7 @@ app.post('/api/update', async (req, res) => {
             }
 
             // 2. Attempt to Acquire Lock
+            let lockAcquiredGlobal = false;
             try {
                 // console.log(`[${code}] Attempting to LOCK with ${lockId}...`);
                 await axios.patch(NOCODB_API_URL, { 
@@ -318,6 +336,7 @@ app.post('/api/update', async (req, res) => {
 
                     if (lockedRecord && lockedRecord.lock_status === lockId) {
                         lockAcquired = true;
+                        lockAcquiredGlobal = true;
                         break;
                     }
                     
@@ -497,17 +516,19 @@ app.post('/api/update', async (req, res) => {
                                     }
                                 } catch (doubleVerifyErr) {
                                     // If verification fails or shows oversell, we MUST Void to be safe
-                                    await axios.patch(
-                                        NOCODB_API_URL,
-                                        {
-                                            Id: record.Id,
-                                            status: 'OPENNING',
-                                            prize: null,
-                                            prize_id: null,
-                                            note: 'Voided: Double Oversell'
-                                        },
-                                        { headers: { 'xc-token': NOCODB_TOKEN } }
-                                    );
+                                    await retryOperation(async () => {
+                                        await axios.patch(
+                                            NOCODB_API_URL,
+                                            {
+                                                Id: record.Id,
+                                                status: 'INVITED', // Reset to INVITED
+                                                prize: null,
+                                                prize_id: null,
+                                                note: 'Voided: Double Oversell'
+                                            },
+                                            { headers: { 'xc-token': NOCODB_TOKEN } }
+                                        );
+                                    }, 5, 500);
                                     return { success: false, error: 'OUT_OF_STOCK' };
                                 }
                                 
@@ -527,17 +548,19 @@ app.post('/api/update', async (req, res) => {
                             } else {
                                 // 3. If ALL prizes are OOS, Void the transaction
                                 console.warn(`All prizes OOS during re-allocation for ${code}. Voiding.`);
-                                await axios.patch(
-                                    NOCODB_API_URL,
-                                    {
-                                        Id: record.Id,
-                                        status: 'OPENNING',
-                                        prize: null,
-                                        prize_id: null,
-                                        note: 'Voided: Out of Stock'
-                                    },
-                                    { headers: { 'xc-token': NOCODB_TOKEN } }
-                                );
+                                await retryOperation(async () => {
+                                    await axios.patch(
+                                        NOCODB_API_URL,
+                                        {
+                                            Id: record.Id,
+                                            status: 'INVITED', // Reset to INVITED
+                                            prize: null,
+                                            prize_id: null,
+                                            note: 'Voided: Out of Stock'
+                                        },
+                                        { headers: { 'xc-token': NOCODB_TOKEN } }
+                                    );
+                                }, 5, 500);
                                 return { success: false, error: 'OUT_OF_STOCK' };
                             }
                         }
@@ -550,17 +573,19 @@ app.post('/api/update', async (req, res) => {
                     // We must attempt to VOID the prize to prevent overselling during outages.
                     try {
                         console.warn(`Attempting to VOID prize for ${code} due to Verification Failure...`);
-                        await axios.patch(
-                            NOCODB_API_URL,
-                            {
-                                Id: record.Id,
-                                status: 'OPENNING',
-                                prize: null,
-                                prize_id: null,
-                                note: 'Voided: Verification Failed (System Error)'
-                            },
-                            { headers: { 'xc-token': NOCODB_TOKEN } }
-                        );
+                        await retryOperation(async () => {
+                            await axios.patch(
+                                NOCODB_API_URL,
+                                {
+                                    Id: record.Id,
+                                    status: 'INVITED', // Reset to INVITED
+                                    prize: null,
+                                    prize_id: null,
+                                    note: 'Voided: Verification Failed (System Error)'
+                                },
+                                { headers: { 'xc-token': NOCODB_TOKEN } }
+                            );
+                        }, 5, 500);
                         return { success: false, error: 'SYSTEM_BUSY' };
                     } catch (voidErr) {
                          console.error("CRITICAL: VOID FAILED for user " + code, voidErr.message);
@@ -612,6 +637,18 @@ app.post('/api/update', async (req, res) => {
     } finally {
         // Release Lock
         processingCodes.delete(code);
+        
+        // EXPLICIT LOCK RELEASE
+        if (typeof lockAcquiredGlobal !== 'undefined' && lockAcquiredGlobal) {
+             try {
+                await axios.patch(NOCODB_API_URL, { 
+                    Id: record.Id, 
+                    lock_status: null 
+                }, { headers: { 'xc-token': NOCODB_TOKEN } });
+             } catch (releaseErr) {
+                 console.warn(`[${code}] Failed to release lock explicitly:`, releaseErr.message);
+             }
+        }
     }
 });
 
