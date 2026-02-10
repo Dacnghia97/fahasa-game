@@ -425,10 +425,10 @@ window.addEventListener('DOMContentLoaded', () => {
 
 const prizes = {
     2: { id: 'prize-2', type: 'computer', name: 'Máy tính Casio FX580', src: 'assets/prize-2.png', note: 'CSKH Fahasa sẽ sớm liên hệ hướng dẫn bạn nhận giải' },
-    3: { id: 'prize-3', type: 'fpoint', name: '5.000 F-point', src: 'assets/prize-3.png', note: '5K F-Point đã được thêm vào ví của bạn' },
-    4: { id: 'prize-4', type: 'fpoint', name: '200.000 F-point', src: 'assets/prize-4.png', note: '200K F-Point đã được thêm vào ví của bạn' },
+    3: { id: 'prize-3', type: 'fpoint', name: '5.000 F-point', src: 'assets/prize-3.png', note: '5K F-Point sẽ được thêm vào ví sau ít phút' },
+    4: { id: 'prize-4', type: 'fpoint', name: '200.000 F-point', src: 'assets/prize-4.png', note: '200K F-Point sẽ được thêm vào ví sau ít phút' },
     // Use 'prize-5' ID to ensure unique lookup, even if user said 'prize-4' for 10k
-    5: { id: 'prize-5', type: 'fpoint', name: '10.000 F-point', src: 'assets/prize-5.png', note: '10K F-Point đã được thêm vào ví của bạn' }
+    5: { id: 'prize-5', type: 'fpoint', name: '10.000 F-point', src: 'assets/prize-5.png', note: '10K F-Point sẽ được thêm vào ví sau ít phút' }
 };
 
 
