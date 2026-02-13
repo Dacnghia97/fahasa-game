@@ -2,32 +2,18 @@
   "name": "fahasha-game-server",
   "version": "1.0.0",
   "description": "Backend for Fahasa Game Condition Check",
-<<<<<<< HEAD
   "main": "api/index.js",
   "scripts": {
     "start": "node api/index.js"
-=======
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
->>>>>>> 1c2b6582ed1c7e6de96f80d6ddc53c31655ba404
   },
   "dependencies": {
     "axios": "^1.6.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
-<<<<<<< HEAD
     "express": "^4.18.2",
     "uuid": "^9.0.1"
-=======
-    "express": "^4.18.2"
->>>>>>> 1c2b6582ed1c7e6de96f80d6ddc53c31655ba404
   },
   "engines": {
     "node": ">=18.0.0"
   }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 1c2b6582ed1c7e6de96f80d6ddc53c31655ba404
