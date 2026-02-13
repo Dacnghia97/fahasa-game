@@ -1,0 +1,263 @@
+const express = require('express');
+require('dotenv').config();
+const cors = require('cors');
+const axios = require('axios');
+const path = require('path');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(cors());
+app.use(express.json());
+app.use(express.static(path.join(__dirname)));
+
+// ===== HEALTH CHECK =====
+app.get('/health', (req, res) => {
+    res.status(200).send('OK');
+});
+
+// ===== CONFIG =====
+const NOCODB_API_URL = 'https://nocodb.smax.in/api/v2/tables/mkuczx2ud6zitcr/records';
+const NOCODB_TOKEN = process.env.NOCODB_TOKEN;
+
+// ===== CHECK CONDITION =====
+app.get('/api/check', async (req, res) => {
+    const { code } = req.query;
+    if (!code) return res.status(400).json({ error: 'Missing random_code' });
+
+    try {
+        const whereClause = `(random_code,eq,${code})`;
+        const response = await axios.get(NOCODB_API_URL, {
+            headers: { 'xc-token': NOCODB_TOKEN },
+            params: { where: whereClause, limit: 1 }
+        });
+
+        const record = response.data.list?.[0];
+        if (!record) return res.json({ valid: false });
+
+        res.json({
+            valid: true,
+            status: record.status,
+            prize: record.prize,
+            prize_id: record.prize_id // Return prize_id
+        });
+
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+// ===== UPDATE STATUS & PLAY GAME =====
+// ===== PRIZE CONFIGURATION =====
+// Adjust limits via Environment Variables on Railway
+// Defaults are set to Production values
+const PRIZE_LIMITS = {
+    'prize-2': parseInt(process.env.PRIZE_LIMIT_2 || '6'),      // Máy tính
+    'prize-3': parseInt(process.env.PRIZE_LIMIT_3 || '1500'),   // 5k Fpoint
+    'prize-4': parseInt(process.env.PRIZE_LIMIT_4 || '20'),     // 200k Fpoint
+    'prize-5': parseInt(process.env.PRIZE_LIMIT_5 || '500')     // 10k Fpoint
+};
+
+const PRIZE_NAMES = {
+    'prize-2': 'Máy tính Casio FX580',
+    'prize-3': '5.000 F-point',
+    'prize-4': '200.000 F-point',
+    'prize-5': '10.000 F-point'
+};
+
+// Prize Cache
+let prizeCache = {
+    data: null,
+    lastFetch: 0,
+    TTL: 15000 // 15 seconds
+};
+
+// Concurrency Lock
+const processingLocks = new Set();
+
+// Helper: Get Current Prize Counts from NocoDB
+async function getPrizeCounts() {
+    // Return cached data if valid
+    if (prizeCache.data && (Date.now() - prizeCache.lastFetch < prizeCache.TTL)) {
+        return prizeCache.data;
+    }
+
+    const counts = {};
+    const promises = Object.keys(PRIZE_LIMITS).map(async (prizeId) => {
+        try {
+            const whereClause = `(prize_id,eq,${prizeId})`;
+            const res = await axios.get(NOCODB_API_URL, {
+                headers: { 'xc-token': NOCODB_TOKEN },
+                params: {
+                    where: whereClause,
+                    limit: 1 // We only need the count metadata
+                }
+            });
+            // NocoDB V2 usually returns { list: [], pageInfo: { totalRows: 10 } }
+            counts[prizeId] = res.data.pageInfo?.totalRows ?? 0;
+        } catch (e) {
+            console.error(`Error counting ${prizeId}:`, e.message);
+            counts[prizeId] = 0;
+        }
+    });
+    await Promise.all(promises);
+
+    // Update Cache
+    prizeCache.data = counts;
+    prizeCache.lastFetch = Date.now();
+
+    return counts;
+}
+
+// Helper: Pick a Random Prize based on weights (remaining quantity)
+function pickRandomPrize(currentCounts) {
+    const availablePrizes = [];
+
+    // Calculate remaining quantity for each prize
+    for (const [id, limit] of Object.entries(PRIZE_LIMITS)) {
+        const used = currentCounts[id] || 0;
+        const remaining = Math.max(0, limit - used);
+
+        if (remaining > 0) {
+            availablePrizes.push({ id, weight: remaining });
+        }
+    }
+
+    if (availablePrizes.length === 0) {
+        return null; // Out of stock
+    }
+
+    // Weighted Random Selection
+    const totalWeight = availablePrizes.reduce((sum, p) => sum + p.weight, 0);
+    let random = Math.random() * totalWeight;
+
+    for (const prize of availablePrizes) {
+        if (random < prize.weight) {
+            return prize.id;
+        }
+        random -= prize.weight;
+    }
+
+    return availablePrizes[availablePrizes.length - 1].id; // Fallback
+}
+
+app.post('/api/update', async (req, res) => {
+    const { code, status } = req.body;
+    // NOTE: We ignore 'prize' and 'prize_id' from client when status is PLAYER
+    // because Server now decides the prize.
+
+    if (!code) {
+        return res.status(400).json({ error: 'Missing code' });
+    }
+
+    // LOCK: Prevent double-click race conditions
+    if (processingLocks.has(code)) {
+        return res.status(429).json({ error: 'Request in progress' });
+    }
+    processingLocks.add(code);
+
+    const targetStatus = status || 'PLAYER';
+
+    try {
+        // 1. Find the Record
+        const whereClause = `(random_code,eq,${code})`;
+        const findRes = await axios.get(NOCODB_API_URL, {
+            headers: { 'xc-token': NOCODB_TOKEN },
+            params: { where: whereClause, limit: 1 }
+        });
+
+        const record = findRes.data.list?.[0];
+        if (!record) return res.status(404).json({ error: 'Record not found' });
+
+        // 2. Cheat Protection Logic
+        if (targetStatus === 'OPENNING') {
+            if (record.status !== 'INVITED') {
+                // Idempotency: If already OPENNING (same session), assume retry? 
+                // But typically client handles that. Server blocks strictly.
+                // Unless it's the SAME device re-sending? 
+                // For safety: strict block.
+                return res.status(409).json({ error: 'Start blocked', currentStatus: record.status });
+            }
+            // Just update status to OPENNING
+            await axios.patch(NOCODB_API_URL, { Id: record.Id, status: 'OPENNING' }, { headers: { 'xc-token': NOCODB_TOKEN } });
+            return res.json({ success: true, status: 'OPENNING' });
+        }
+
+        if (targetStatus === 'PLAYER') {
+            // If already played, return the existing prize (Don't roll again)
+            if (record.status === 'PLAYER') {
+                return res.json({
+                    success: true,
+                    status: 'PLAYER',
+                    prize: record.prize,
+                    prize_id: record.prize_id,
+                    is_existing: true // Flag to tell client this is an old prize
+                });
+            }
+
+            // Ensure valid transition (must lie in OPENNING or INVITED)
+            if (record.status !== 'INVITED' && record.status !== 'OPENNING') {
+                return res.status(409).json({ error: 'Check blocked', currentStatus: record.status });
+            }
+
+            // 3. LOTTERY LOGIC (Server Side)
+            const currentCounts = await getPrizeCounts();
+            const winningPrizeId = pickRandomPrize(currentCounts);
+
+            if (!winningPrizeId) {
+                // Out of stock behavior
+                // Option A: Return specific error
+                // Option B: Give a fallback "consolation prize" (if config allows)
+                return res.status(422).json({ error: 'All prizes are out of stock!' });
+            }
+
+            const winningPrizeName = PRIZE_NAMES[winningPrizeId];
+
+            console.log(`User ${code} won ${winningPrizeId} (${winningPrizeName})`);
+
+            // 5. OPTIMISTIC RESPONSE (Return to client immediately)
+            // Update Cache Immediately
+            if (winningPrizeId && prizeCache.data) {
+                prizeCache.data[winningPrizeId] = (prizeCache.data[winningPrizeId] || 0) + 1;
+            }
+
+            res.json({
+                success: true,
+                status: 'PLAYER',
+                prize: winningPrizeName,
+                prize_id: winningPrizeId
+            });
+
+            // 6. Update NocoDB (Async Background)
+            try {
+                await axios.patch(
+                    NOCODB_API_URL,
+                    {
+                        Id: record.Id,
+                        status: 'PLAYER',
+                        prize: winningPrizeName,
+                        prize_id: winningPrizeId
+                    },
+                    { headers: { 'xc-token': NOCODB_TOKEN } }
+                );
+            } catch (bgError) {
+                console.error(`Background Update Failed for ${code}:`, bgError.message);
+                // We can't tell the user anymore, but we logged it.
+                // Revert cache? No, better safely count as used.
+            }
+        }
+
+    } catch (err) {
+        console.error(err.response?.data || err.message);
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'Update failed' });
+        }
+    } finally {
+        // UNLOCK
+        processingLocks.delete(code);
+    }
+});
+
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});

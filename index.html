@@ -5,8 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <!-- Favicon -->
-    <link rel="icon" href="assets/favicon.jpg" type="image/x-icon">
     <title>Hái Lộc Đầu Xuân 2026</title>
     <link rel="stylesheet" href="styles.css">
     <link
@@ -57,9 +55,7 @@
             </p>
 
             <!-- Primary Action Button -->
-            <!-- Initially hidden to prevent flicker, revealed by JS after status check -->
-            <div id="loading-spinner" class="loading-spinner"></div>
-            <button class="btn btn-primary btn-img-mode" onclick="startProgram()" style="display: none !important;">
+            <button class="btn btn-primary btn-img-mode" onclick="startProgram()">
                 <img src="assets/btn-start.png" alt="Bắt Đầu Ngay">
             </button>
 
@@ -81,43 +77,38 @@
     </div>
 
     <!-- Game Page -->
-    <!-- Game Page -->
-    <div id="game-page" class="app-container" style="display: none;">
-        <!-- Layer 1: Background -->
-        <img class="game-bg-layer" src="assets/game-bg-layer.png" alt="Background">
+    <div id="game-page" class="app-container" style="display: none; background-image: url('assets/bg-game.png');">
+        <!-- Game Header (Optional hidden title or similar to home) -->
+        <header class="game-header" style="height: 20dvh;"></header>
 
-        <!-- Layer 2: Banner -->
-        <img class="game-banner" src="assets/game-banner.png" alt="Banner">
-
-        <!-- Layer 3: Frame & Envelopes -->
-        <div class="game-frame-container">
-            <img class="game-frame-bg" src="assets/game-frame.png" alt="Frame">
-
-            <!-- Envelopes Grid -->
-            <div class="envelopes-grid" id="envelopes-grid">
-                <div class="envelope-item" onclick="selectEnvelope(1)">
-                    <img src="assets/envelope-1.png" alt="Lì Xì 1" class="envelope-img">
-                </div>
-                <div class="envelope-item" onclick="selectEnvelope(2)">
-                    <img src="assets/envelope-2.png" alt="Lì Xì 2" class="envelope-img">
-                </div>
-                <div class="envelope-item" onclick="selectEnvelope(3)">
-                    <img src="assets/envelope-3.png" alt="Lì Xì 3" class="envelope-img">
-                </div>
-                <div class="envelope-item" onclick="selectEnvelope(4)">
-                    <img src="assets/envelope-4.png" alt="Lì Xì 4" class="envelope-img">
-                </div>
-                <div class="envelope-item" onclick="selectEnvelope(5)">
-                    <img src="assets/envelope-5.png" alt="Lì Xì 5" class="envelope-img">
-                </div>
-                <div class="envelope-item" onclick="selectEnvelope(6)">
-                    <img src="assets/envelope-6.png" alt="Lì Xì 6" class="envelope-img">
-                </div>
+        <!-- Envelopes Grid -->
+        <div class="envelopes-grid" id="envelopes-grid">
+            <div class="envelope-item" onclick="selectEnvelope(1)">
+                <img src="assets/envelope-1.png" alt="Lì Xì 1" class="envelope-img">
+            </div>
+            <div class="envelope-item" onclick="selectEnvelope(2)">
+                <img src="assets/envelope-2.png" alt="Lì Xì 2" class="envelope-img">
+            </div>
+            <div class="envelope-item" onclick="selectEnvelope(3)">
+                <img src="assets/envelope-3.png" alt="Lì Xì 3" class="envelope-img">
+            </div>
+            <div class="envelope-item" onclick="selectEnvelope(4)">
+                <img src="assets/envelope-4.png" alt="Lì Xì 4" class="envelope-img">
+            </div>
+            <div class="envelope-item" onclick="selectEnvelope(5)">
+                <img src="assets/envelope-5.png" alt="Lì Xì 5" class="envelope-img">
+            </div>
+            <div class="envelope-item" onclick="selectEnvelope(6)">
+                <img src="assets/envelope-6.png" alt="Lì Xì 6" class="envelope-img">
             </div>
         </div>
 
-        <!-- Layer 4: Footer -->
-        <img class="game-footer" src="assets/game-footer.png" alt="Footer">
+        <!-- Mascot (as footer or absolute) -->
+        <!-- Based on reference, mascot is at the bottom. The background image likely contains it? 
+             User sent background image. Let's assume background image has the mascot. 
+             If not, we might need a separate mascot image.
+             Looking at the uploaded image 'uploaded_image_1769007623286.png', it seems to have the mascot at the bottom!
+             So we just need the grid. -->
     </div>
 
     <!-- Welcome Popup -->

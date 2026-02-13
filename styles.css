@@ -1,0 +1,592 @@
+:root {
+    --primary-green: #004d40;
+    --secondary-green: #00695c;
+    --gold: #ffd700;
+    --gold-dark: #b8860b;
+    --red: #d32f2f;
+    --red-dark: #b71c1c;
+    --text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    --border-gold: 2px solid #ffd700;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: var(--primary-green);
+    color: white;
+    /* Use dvh to handle mobile browser address bars correctly */
+    height: 100dvh;
+    width: 100vw;
+    overflow: hidden;
+    background: radial-gradient(circle at center, #00695c 0%, #004d40 100%);
+    /* Prevent bouncy scroll on iOS */
+    overscroll-behavior: none;
+}
+
+.app-container {
+    max-width: 480px;
+    /* Mobile width mimic */
+    width: 100%;
+    margin: 0 auto;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    padding: 10px;
+    background-image: url('assets/bg-main.png');
+    background-size: 100% 100%;
+    /* Stretch to fill as it's a specific design */
+    background-position: top center;
+    background-repeat: no-repeat;
+}
+
+/* --- Header --- */
+.main-header {
+    /* Removed flex: 1 to stop pushing content down */
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    /* Align bottom to be safer */
+    width: 100%;
+    text-align: center;
+    padding-top: 40dvh;
+    /* Adjusted to 40dvh as requested */
+    padding-bottom: 2dvh;
+}
+
+.title-text {
+    /* Title is in the background image now */
+    display: none;
+    font-family: 'Dancing Script',
+        cursive;
+    /* Responsive font size based on viewport width */
+    font-size: clamp(2.5rem, 8vw, 3.5rem);
+    line-height: 1.2;
+    background: linear-gradient(to bottom, #fff7ad, #ffa000);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0px 4px 6px rgba(0, 0, 0, 0.8));
+    transform: rotate(-5deg);
+}
+
+.year {
+    font-size: clamp(4rem, 12vw, 6rem);
+    display: block;
+    margin-top: -10px;
+}
+
+/* --- Main Game Area --- */
+.game-area {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1dvh;
+    padding-bottom: 20px;
+    /* Space for footer */
+    z-index: 10;
+}
+
+.cards-container {
+    display: flex;
+    justify-content: center;
+    gap: 25px;
+    width: 100%;
+    margin-bottom: 1dvh;
+}
+
+.card {
+    width: 42%;
+    /* Slightly smaller to ensure fit */
+    aspect-ratio: 1/1;
+    background: linear-gradient(135deg, #b71c1c, #d32f2f);
+    border: 3px solid #ffd700;
+    border-radius: 15px;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(255, 215, 0, 0.3);
+    /* Touch optimization */
+    touch-action: manipulation;
+    /* Breathing animation */
+    animation: breathing 2s infinite ease-in-out;
+}
+
+@keyframes breathing {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+        /* Slight scale up */
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.card-header-badge {
+    position: absolute;
+    top: -12px;
+    background: #8b0000;
+    color: #ffd700;
+    padding: 4px 8px;
+    border-radius: 20px;
+    font-size: clamp(0.7rem, 2.5vw, 0.9rem);
+    font-weight: bold;
+    border: 1px solid #ffd700;
+    white-space: nowrap;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    z-index: 2;
+}
+
+.img-placeholder {
+    font-size: clamp(3rem, 10vw, 4.5rem);
+    filter: drop-shadow(0 5px 5px rgba(0, 0, 0, 0.5));
+}
+
+/* --- Buttons --- */
+.btn {
+    cursor: pointer;
+    font-family: 'Roboto', sans-serif;
+    font-weight: bold;
+    text-transform: uppercase;
+    border: none;
+    outline: none;
+    transition: transform 0.1s;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+.btn:active {
+    transform: scale(0.96);
+}
+
+.btn-primary {
+    width: 75%;
+    padding: 15px;
+    /* Ensure minimum touch target size */
+    min-height: 55px;
+    border-radius: 50px;
+    font-size: clamp(1.2rem, 5vw, 1.6rem);
+    color: #fff;
+    background: linear-gradient(to bottom, #d50000, #8b0000);
+    border: 3px solid #ffd700;
+    box-shadow:
+        0 6px 0 #5a0000,
+        0 10px 10px rgba(0, 0, 0, 0.5);
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    background-size: 200% auto;
+    margin-top: 10px;
+}
+
+.secondary-actions {
+    display: flex;
+    gap: 20px;
+    width: 80%;
+    justify-content: center;
+    margin-top: 5px;
+}
+
+.btn-secondary {
+    flex: 1;
+    padding: 10px;
+    min-height: 44px;
+    /* Apple Human Interface Guideline minimum */
+    border-radius: 50px;
+    font-size: clamp(0.9rem, 3.5vw, 1.1rem);
+    color: #fff;
+    background: linear-gradient(to bottom, #00bfa5, #00695c);
+    border: 3px solid #ffd700;
+    box-shadow:
+        0 4px 0 #003d33,
+        0 6px 6px rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+}
+
+.btn-secondary .icon {
+    font-size: 1.2rem;
+}
+
+/* --- Footer --- */
+.footer-decoration {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 120px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='%23ffffff44' fill-opacity='1' d='M0,224L48,213.3C96,203,192,181,288,181.3C384,181,480,203,576,224C672,245,768,267,864,250.7C960,235,1056,181,1152,165.3C1248,149,1344,171,1392,181.3L1440,192L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'%3E%3C/path%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: bottom;
+    pointer-events: none;
+    z-index: 1;
+    display: block;
+}
+
+/* Image Mode Overrides */
+.btn-img-mode {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    min-height: auto !important;
+    width: auto !important;
+    display: inline-flex !important;
+}
+
+.btn-img-mode img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    transition: transform 0.1s;
+}
+
+.btn-img-mode:active img {
+    transform: scale(0.95);
+}
+
+/* Remove default card styling to let image take over */
+.card-lixi,
+.card-gift {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.card-content {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.card-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 5px 5px rgba(0, 0, 0, 0.3));
+}
+
+.secondary-actions {
+    gap: 10px;
+    align-items: flex-start;
+}
+
+/* --- Popup --- */
+/* Custom Rules Popup Styles */
+.popup-rules-custom {
+    max-width: 450px !important;
+    width: 95% !important;
+}
+
+.rules-bg-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.rules-bg-img {
+    width: 100%;
+    display: block;
+    filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.5));
+}
+
+.rules-scroll-area {
+    position: absolute;
+    top: 14%;
+    left: 12%;
+    width: 76%;
+    height: 72%;
+    overflow-y: auto;
+    padding-right: 5px;
+    /* Custom Scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: #d8a027 transparent;
+}
+
+.rules-scroll-area::-webkit-scrollbar {
+    width: 6px;
+}
+
+.rules-scroll-area::-webkit-scrollbar-thumb {
+    background-color: #d8a027;
+    border-radius: 3px;
+}
+
+.rules-scroll-area::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.rules-content-img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 100;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    align-items: center;
+    /* Zoom in animation */
+    animation: zoomIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    /* Bouncy fast zoom */
+}
+
+@keyframes zoomIn {
+    from {
+        opacity: 0;
+        transform: scale(0.5);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.popup-container {
+    position: relative;
+    width: 90%;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Specific fix for Game Page Background */
+#game-page {
+    position: relative;
+    width: 100vw;
+    height: 100dvh;
+    overflow: hidden;
+    background: #000; /* Fallback */
+}
+
+/* --- New Layered Background Styles --- */
+.game-bg-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 1;
+}
+
+.game-banner {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    max-height: 25dvh; /* Limit height so it doesn't cover too much */
+    object-fit: contain;
+    object-position: top center;
+    z-index: 5;
+    pointer-events: none;
+}
+
+.game-footer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-height: 20dvh;
+    object-fit: contain;
+    object-position: bottom center;
+    z-index: 5;
+    pointer-events: none;
+}
+
+.game-frame-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 500px;
+    z-index: 10;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.game-frame-bg {
+    width: 100%;
+    height: auto;
+    display: block;
+    /* Optional drop shadow for depth */
+    filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5));
+}
+
+/* --- Game Page Styles --- */
+/* --- Game Page Styles --- */
+.envelopes-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    /* grid-template-rows: repeat(2, 1fr); */
+    gap: 15px; /* Add gap back */
+    width: 70%; /* Fit inside the frame */
+    
+    /* Absolute positioning relative to frame container */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    
+    margin: 0;
+    padding: 0;
+    z-index: 15;
+}
+
+.envelope-item {
+    width: 100%;
+    aspect-ratio: 0.55;
+    background: transparent;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: transform 0.2s;
+    position: relative;
+    touch-action: manipulation;
+}
+
+/* Game Page - Flat Grid Layout */
+/* Staggered margins removed for uniform grid */
+
+.envelope-item:active {
+    transform: scale(0.95);
+}
+
+.envelope-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+/* Float animation */
+@keyframes float {
+    0% {
+        transform: translateY(0px);
+    }
+
+    50% {
+        transform: translateY(-10px);
+        /* Increased from -3px to -10px */
+    }
+
+    100% {
+        transform: translateY(0px);
+    }
+}
+
+.envelope-item {
+    animation: float 3s ease-in-out infinite;
+}
+
+.envelope-item:nth-child(even) {
+    animation-delay: 1.5s;
+}
+
+.popup-note-img {
+    width: 100%;
+    height: auto;
+    display: block;
+    filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.5));
+}
+
+.popup-actions {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    width: 100%;
+    margin-top: 20px;
+}
+
+.btn-popup-action {
+    width: 45%;
+    height: auto;
+    cursor: pointer;
+    z-index: 20;
+    transition: transform 0.2s;
+    display: flex;
+    /* alignment */
+    justify-content: center;
+}
+
+.btn-popup-action img {
+    width: 100%;
+    height: auto;
+    display: block;
+    filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.3));
+}
+
+.btn-popup-action:active {
+    transform: scale(0.95);
+}
+
+.btn-popup-close {
+    margin-top: 15px;
+    /* Add space instead of overlap */
+    background: none;
+    border: none;
+    cursor: pointer;
+    width: 80%;
+    /* Make button larger */
+    transition: transform 0.2s;
+    z-index: 101;
+}
+
+.result-note {
+    color: #fff;
+    text-align: center;
+    font-size: clamp(0.9rem, 3vw, 1.1rem);
+    margin: 10px 0;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    width: 90%;
+    line-height: 1.4;
+}
+
+.btn-popup-close:active {
+    transform: scale(0.95);
+}
+
+.btn-popup-close img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* Ensure contact popup appears above result popup */
+#popup-contact {
+    z-index: 200 !important;
+}
+
+/* Ensure rules popup appears above everything */
+#popup-rules {
+    z-index: 300 !important;
+}
