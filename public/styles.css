@@ -249,22 +249,6 @@ body {
     display: inline-flex !important;
 }
 
-/* Loading Spinner */
-.loading-spinner {
-    width: 40px;
-    height: 40px;
-    border: 4px solid rgba(255, 255, 255, 0.3);
-    border-radius: 50%;
-    border-top: 4px solid #ffd700;
-    animation: spin 1s linear infinite;
-    margin: 10px auto;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
 .btn-img-mode img {
     display: block;
     max-width: 100%;
@@ -394,38 +378,87 @@ body {
 
 /* Specific fix for Game Page Background */
 #game-page {
-    /* "Giãn tự động" - Stretch to fill */
-    background-size: cover !important;
-    background-position: center !important;
-    background-repeat: no-repeat !important;
-    aspect-ratio: 9/16;
-    /* Ensure it hits the edges or centers? */
+    position: relative;
     width: 100vw;
-    height: auto;
-    /* Let aspect ratio define height, or max-height 100dvh? */
-    min-height: 100dvh;
-    /* Or force full height */
+    height: 100dvh;
+    overflow: hidden;
+    background: #000; /* Fallback */
 }
 
+/* --- New Layered Background Styles --- */
+.game-bg-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 1;
+}
+
+.game-banner {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    max-height: 25dvh; /* Limit height so it doesn't cover too much */
+    object-fit: contain;
+    object-position: top center;
+    z-index: 5;
+    pointer-events: none;
+}
+
+.game-footer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-height: 20dvh;
+    object-fit: contain;
+    object-position: bottom center;
+    z-index: 5;
+    pointer-events: none;
+}
+
+.game-frame-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 500px;
+    z-index: 10;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.game-frame-bg {
+    width: 100%;
+    height: auto;
+    display: block;
+    /* Optional drop shadow for depth */
+    filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5));
+}
+
+/* --- Game Page Styles --- */
 /* --- Game Page Styles --- */
 .envelopes-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     /* grid-template-rows: repeat(2, 1fr); */
-    gap: 0px;
-    column-gap: 15px;
-    width: 75%;
-
-    /* Absolute positioning to place it freely on background */
+    gap: 15px; /* Add gap back */
+    width: 70%; /* Fit inside the frame */
+    
+    /* Absolute positioning relative to frame container */
     position: absolute;
+    top: 50%;
     left: 50%;
-    transform: translateX(-50%);
-    bottom: 20%;
-    /* Adjusted lower for mobile alignment */
-
+    transform: translate(-50%, -50%);
+    
     margin: 0;
-    padding: 0px;
-    z-index: 10;
+    padding: 0;
+    z-index: 15;
 }
 
 .envelope-item {
@@ -556,24 +589,4 @@ body {
 /* Ensure rules popup appears above everything */
 #popup-rules {
     z-index: 300 !important;
-}
-
-/* Shake Animation */
-@keyframes shake {
-    0% { transform: translate(1px, 1px) rotate(0deg); }
-    10% { transform: translate(-1px, -2px) rotate(-1deg); }
-    20% { transform: translate(-3px, 0px) rotate(1deg); }
-    30% { transform: translate(3px, 2px) rotate(0deg); }
-    40% { transform: translate(1px, -1px) rotate(1deg); }
-    50% { transform: translate(-1px, 2px) rotate(-1deg); }
-    60% { transform: translate(-3px, 1px) rotate(0deg); }
-    70% { transform: translate(3px, 1px) rotate(-1deg); }
-    80% { transform: translate(-1px, -1px) rotate(1deg); }
-    90% { transform: translate(1px, 2px) rotate(0deg); }
-    100% { transform: translate(1px, -2px) rotate(-1deg); }
-}
-
-.shaking {
-    animation: shake 0.5s;
-    animation-iteration-count: infinite;
 }
